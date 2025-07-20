@@ -83,7 +83,6 @@ export default function AuthPage() {
       const result = await response.json()
 
       if (response.ok) {
-        alert('Account created successfully! Please login with your credentials.')
         // Reset form
         setFormData({
           firstName: '',

@@ -35,8 +35,6 @@ export async function POST(req) {
       },
     })
 
-    console.log('User created:', user);
-
     return Response.json({ message: 'User created successfully', user }, { status: 201 })
 
   } catch (error) {
