@@ -13,6 +13,7 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoginLoading, setIsLoginLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("login")
   const [formData, setFormData] = useState({
     firstName: '',
@@ -106,12 +107,52 @@ export default function AuthPage() {
     }
   }
 
-  // Handle login form submission (placeholder for now)
+  // Handle login form submission
   const handleLoginSubmit = async (e) => {
     e.preventDefault()
-    // Add login logic here when you create the login API
-    console.log('Login attempt:', loginData)
-    alert('Login functionality not implemented yet')
+    
+    // Basic validation
+    if (!loginData.email || !loginData.password) {
+      alert('Please fill in all fields')
+      return
+    }
+
+    setIsLoginLoading(true)
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: loginData.email,
+          password: loginData.password,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        alert(`Welcome back! Login successful.`)
+        // Reset login form
+        setLoginData({
+          email: '',
+          password: ''
+        })
+        // Here you can redirect to dashboard or store user data
+        console.log('User logged in:', result.user)
+        // You can redirect to dashboard here:
+        // window.location.href = '/dashboard'
+      } else {
+        alert(result.error || 'Login failed')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      alert('An error occurred. Please try again.')
+    } finally {
+      setIsLoginLoading(false)
+    }
   }
 
   return (
@@ -194,8 +235,12 @@ export default function AuthPage() {
                     <button type="button" className="text-sm text-white hover:underline">Forgot password?</button>
                   </div>
 
-                  <Button type="submit" className="w-full bg-white text-black hover:bg-gray-100 font-medium">
-                    Login
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-white text-black hover:bg-gray-100 font-medium"
+                    disabled={isLoginLoading}
+                  >
+                    {isLoginLoading ? 'Logging in...' : 'Login'}
                   </Button>
                 </form>
 
