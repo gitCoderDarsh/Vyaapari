@@ -130,16 +130,34 @@ export default function AuthPage() {
         redirect: false,
       })
 
-      if (result?.error) {
-        alert('Invalid credentials')
-      } else {
+      console.log('Frontend - Full login result:', JSON.stringify(result, null, 2))
+
+      // NextAuth with redirect: false returns:
+      // Success: { ok: true, status: 200, error: null, url: null }
+      // Error: { ok: false, status: 401, error: "CredentialsSignin", url: null }
+      
+      // Check for URL-based OAuth errors that shouldn't affect credentials login
+      if (result?.error === "OAuthCreateAccount" && result?.ok === true) {
+        console.log('Frontend - Ignoring OAuth error for credentials login')
         // Reset login form
         setLoginData({
           email: '',
           password: ''
         })
-        // Redirect to dashboard
-        router.push('/dashboard')
+        // Redirect to inventory as main dashboard page
+        router.push('/dashboard/inventory')
+      } else if (result?.ok === true && !result?.error) {
+        console.log('Frontend - Login SUCCESS!')
+        // Reset login form
+        setLoginData({
+          email: '',
+          password: ''
+        })
+        // Redirect to inventory as main dashboard page
+        router.push('/dashboard/inventory')
+      } else {
+        console.log('Frontend - Login FAILED:', result?.error || 'Unknown error')
+        alert(`Login failed: ${result?.error || 'Invalid credentials'}`)
       }
     } catch (error) {
       console.error('Login error:', error)
