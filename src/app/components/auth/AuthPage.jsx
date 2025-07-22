@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import GoogleButton from "@/components/auth/GoogleButton"
 
 export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -251,9 +252,7 @@ export default function AuthPage() {
                   </div>
                 </div>
 
-                <Button variant="outline" className="w-full border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white bg-transparent">
-                  Continue with Google
-                </Button>
+                <GoogleButton />
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">
@@ -395,9 +394,7 @@ export default function AuthPage() {
                   </div>
                 </div>
 
-                <Button variant="outline" className="w-full border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white bg-transparent">
-                  Continue with Google
-                </Button>
+                <GoogleButton />
               </TabsContent>
             </Tabs>
           </CardContent>
