@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSession, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import MobileHeader from "@/components/dashboard/MobileHeader"
@@ -9,9 +9,10 @@ import Sidebar from "@/components/dashboard/Sidebar"
 import ProfileCard from "@/components/dashboard/ProfileCard"
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal"
 import LogoutModal from "@/components/dashboard/LogoutModal"
+import Toast from "@/components/ui/toast"
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update } = useSession()
   const router = useRouter()
   
   const [isEditing, setIsEditing] = useState(false)
@@ -19,6 +20,8 @@ export default function ProfilePage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("Profile")
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" })
 
   // Profile data state - Initialize with session data if available
   const [profileData, setProfileData] = useState({
@@ -31,6 +34,32 @@ export default function ProfilePage() {
   })
 
   const [editData, setEditData] = useState(profileData)
+
+  // Fetch fresh profile data from database
+  const fetchProfileData = useCallback(async () => {
+    try {
+      const response = await fetch('/api/profile')
+      if (response.ok) {
+        const data = await response.json()
+        const user = data.user
+        
+        const freshData = {
+          businessName: user.businessName || "Your Business",
+          firstName: user.firstName || "First",
+          lastName: user.lastName || "Last",
+          email: user.email || "",
+          phone: user.phone || "",
+          logo: user.image || "/placeholder.svg?height=120&width=120&text=Logo",
+        }
+        
+        setProfileData(freshData)
+        setEditData(freshData)
+        console.log('Fresh profile data loaded:', freshData)
+      }
+    } catch (error) {
+      console.error('Error fetching profile data:', error)
+    }
+  }, [])
 
   // Update profile data when session loads
   useEffect(() => {
@@ -74,12 +103,45 @@ export default function ProfilePage() {
     setShowModal(true)
   }
 
-  const handleModalConfirm = () => {
-    setProfileData(editData)
-    setIsEditing(false)
-    setShowModal(false)
-    // Here you can add API call to save profile data
-    console.log("Profile updated:", editData)
+  const handleModalConfirm = async () => {
+    setIsUpdating(true)
+    
+    try {
+      // Call API to update profile in database
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName: editData.firstName,
+          lastName: editData.lastName,
+          businessName: editData.businessName,
+          phone: editData.phone,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        // Update local state with the response data
+        setProfileData(editData)
+        setIsEditing(false)
+        setShowModal(false)
+        console.log("Profile updated successfully:", result.user)
+        
+        // Show success toast
+        showToast("Profile updated successfully!")
+      } else {
+        console.error("Profile update failed:", result.error)
+        showToast(`Failed to update profile: ${result.error}`, "error")
+      }
+    } catch (error) {
+      console.error("Profile update error:", error)
+      showToast("An error occurred while updating your profile. Please try again.", "error")
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   const handleModalCancel = () => {
@@ -88,6 +150,14 @@ export default function ProfilePage() {
 
   const handleInputChange = (field, value) => {
     setEditData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type })
+  }
+
+  const hideToast = () => {
+    setToast({ show: false, message: "", type: "success" })
   }
 
   const handleNavClick = (itemName) => {
@@ -102,7 +172,11 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     setShowLogoutModal(false)
-    signOut({ callbackUrl: "/auth" })
+    showToast("Logging out... See you soon!", "success")
+    // Add a small delay to show the toast before redirecting
+    setTimeout(() => {
+      signOut({ callbackUrl: "/auth" })
+    }, 1000)
   }
 
   // Show loading while checking authentication
@@ -163,12 +237,20 @@ export default function ProfilePage() {
         showModal={showModal}
         handleModalConfirm={handleModalConfirm}
         handleModalCancel={handleModalCancel}
+        isLoading={isUpdating}
       />
 
       <LogoutModal
         showLogoutModal={showLogoutModal}
         setShowLogoutModal={setShowLogoutModal}
         handleLogout={handleLogout}
+      />
+
+      <Toast
+        show={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={hideToast}
       />
     </div>
   )

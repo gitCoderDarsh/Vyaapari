@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function LoginForm() {
+export default function LoginForm({ onLoginSuccess, showToast }) {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoginLoading, setIsLoginLoading] = useState(false)
@@ -32,7 +32,11 @@ export default function LoginForm() {
     
     // Basic validation
     if (!loginData.email || !loginData.password) {
-      alert('Please fill in all fields')
+      if (showToast) {
+        showToast('Please fill in all fields', "error")
+      } else {
+        alert('Please fill in all fields')
+      }
       return
     }
 
@@ -59,6 +63,9 @@ export default function LoginForm() {
           email: '',
           password: ''
         })
+        // Show success toast and call callback
+        if (showToast) showToast("Login successful! Redirecting to dashboard...", "success")
+        if (onLoginSuccess) onLoginSuccess()
         // Redirect to inventory as main dashboard page
         router.push('/dashboard/inventory')
       } else if (result?.ok === true && !result?.error) {
@@ -68,15 +75,26 @@ export default function LoginForm() {
           email: '',
           password: ''
         })
+        // Show success toast and call callback
+        if (showToast) showToast("Welcome back! Redirecting to dashboard...", "success")
+        if (onLoginSuccess) onLoginSuccess()
         // Redirect to inventory as main dashboard page
         router.push('/dashboard/inventory')
       } else {
         console.log('Frontend - Login FAILED:', result?.error || 'Unknown error')
-        alert(`Login failed: ${result?.error || 'Invalid credentials'}`)
+        if (showToast) {
+          showToast(`Login failed: ${result?.error || 'Invalid credentials'}`, "error")
+        } else {
+          alert(`Login failed: ${result?.error || 'Invalid credentials'}`)
+        }
       }
     } catch (error) {
       console.error('Login error:', error)
-      alert('An error occurred. Please try again.')
+      if (showToast) {
+        showToast('An error occurred. Please try again.', "error")
+      } else {
+        alert('An error occurred. Please try again.')
+      }
     } finally {
       setIsLoginLoading(false)
     }

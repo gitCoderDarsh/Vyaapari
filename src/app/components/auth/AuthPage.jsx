@@ -8,12 +8,27 @@ import AuthFooter from "@/components/auth/AuthFooter"
 import AuthDivider from "@/components/auth/AuthDivider"
 import LoginForm from "@/components/auth/LoginForm"
 import SignupForm from "@/components/auth/SignupForm"
+import Toast from "@/components/ui/toast"
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState("login")
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" })
 
   const handleSignupSuccess = () => {
     setActiveTab("login")
+    showToast("Account created successfully! Please login with your credentials.", "success")
+  }
+
+  const handleLoginSuccess = () => {
+    showToast("Welcome back! Redirecting to dashboard...", "success")
+  }
+
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type })
+  }
+
+  const hideToast = () => {
+    setToast({ show: false, message: "", type: "success" })
   }
 
   return (
@@ -46,12 +61,12 @@ export default function AuthPage() {
               </TabsList>
 
               <TabsContent value="login" className="space-y-4">
-                <LoginForm />
+                <LoginForm onLoginSuccess={handleLoginSuccess} showToast={showToast} />
                 <AuthDivider />
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">
-                <SignupForm onSignupSuccess={handleSignupSuccess} />
+                <SignupForm onSignupSuccess={handleSignupSuccess} showToast={showToast} />
                 <AuthDivider />
               </TabsContent>
             </Tabs>
@@ -59,6 +74,13 @@ export default function AuthPage() {
         </Card>
 
         <AuthFooter />
+
+        <Toast
+          show={toast.show}
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
       </div>
     </div>
   )

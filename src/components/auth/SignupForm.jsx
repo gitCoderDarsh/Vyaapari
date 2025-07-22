@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function SignupForm({ onSignupSuccess }) {
+export default function SignupForm({ onSignupSuccess, showToast }) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -36,12 +36,20 @@ export default function SignupForm({ onSignupSuccess }) {
     // Basic validation
     if (!formData.firstName || !formData.lastName || !formData.businessName ||
       !formData.email || !formData.phone || !formData.password) {
-      alert('Please fill in all required fields')
+      if (showToast) {
+        showToast('Please fill in all required fields', "error")
+      } else {
+        alert('Please fill in all required fields')
+      }
       return
     }
 
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match')
+      if (showToast) {
+        showToast('Passwords do not match', "error")
+      } else {
+        alert('Passwords do not match')
+      }
       return
     }
 
@@ -76,16 +84,24 @@ export default function SignupForm({ onSignupSuccess }) {
           password: '',
           confirmPassword: ''
         })
-        // Call the callback to switch to login tab
+        // Call the callback to switch to login tab (this will also show toast)
         if (onSignupSuccess) {
           onSignupSuccess()
         }
       } else {
-        alert(result.error || 'Failed to create account')
+        if (showToast) {
+          showToast(result.error || 'Failed to create account', "error")
+        } else {
+          alert(result.error || 'Failed to create account')
+        }
       }
     } catch (error) {
       console.error('Signup error:', error)
-      alert('An error occurred. Please try again.')
+      if (showToast) {
+        showToast('An error occurred. Please try again.', "error")
+      } else {
+        alert('An error occurred. Please try again.')
+      }
     } finally {
       setIsLoading(false)
     }

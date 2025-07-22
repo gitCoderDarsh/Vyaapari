@@ -7,6 +7,7 @@ import MobileHeader from "@/components/dashboard/MobileHeader"
 import MobileMenu from "@/components/dashboard/MobileMenu"
 import Sidebar from "@/components/dashboard/Sidebar"
 import LogoutModal from "@/components/dashboard/LogoutModal"
+import Toast from "@/components/ui/toast"
 import { Package, Plus, Search, Filter } from "lucide-react"
 
 export default function InventoryPage() {
@@ -16,6 +17,15 @@ export default function InventoryPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("Inventory")
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" })
+
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type })
+  }
+
+  const hideToast = () => {
+    setToast({ show: false, message: "", type: "success" })
+  }
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -41,7 +51,11 @@ export default function InventoryPage() {
 
   const handleLogout = () => {
     setShowLogoutModal(false)
-    signOut({ callbackUrl: "/auth" })
+    showToast("Logging out... See you soon!", "success")
+    // Add a small delay to show the toast before redirecting
+    setTimeout(() => {
+      signOut({ callbackUrl: "/auth" })
+    }, 1000)
   }
 
   // Show loading while checking authentication
@@ -174,6 +188,13 @@ export default function InventoryPage() {
         showLogoutModal={showLogoutModal}
         setShowLogoutModal={setShowLogoutModal}
         handleLogout={handleLogout}
+      />
+
+      <Toast
+        show={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={hideToast}
       />
     </div>
   )
