@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { signIn } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Building2, Mail, Lock, User, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import GoogleButton from "@/components/auth/GoogleButton"
 
 export default function AuthPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -121,32 +124,22 @@ export default function AuthPage() {
     setIsLoginLoading(true)
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: loginData.email,
-          password: loginData.password,
-        }),
+      const result = await signIn('credentials', {
+        email: loginData.email,
+        password: loginData.password,
+        redirect: false,
       })
 
-      const result = await response.json()
-
-      if (response.ok) {
-        alert(`Welcome back! Login successful.`)
+      if (result?.error) {
+        alert('Invalid credentials')
+      } else {
         // Reset login form
         setLoginData({
           email: '',
           password: ''
         })
-        // Here you can redirect to dashboard or store user data
-        console.log('User logged in:', result.user)
-        // You can redirect to dashboard here:
-        // window.location.href = '/dashboard'
-      } else {
-        alert(result.error || 'Login failed')
+        // Redirect to dashboard
+        router.push('/dashboard')
       }
     } catch (error) {
       console.error('Login error:', error)

@@ -1,5 +1,11 @@
 import prisma from '@/lib/prisma'
 import { hash } from 'bcryptjs'
+import { randomBytes } from 'crypto'
+
+// Generate a cuid-like ID
+function generateId() {
+  return 'cm' + randomBytes(10).toString('base64url')
+}
 
 export async function POST(req) {
   try {
@@ -25,6 +31,7 @@ export async function POST(req) {
     // Create new user
     const user = await prisma.user.create({
       data: {
+        id: generateId(),
         firstName,
         lastName,
         businessName,
