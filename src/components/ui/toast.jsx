@@ -24,7 +24,7 @@ export default function Toast({ message, type = "success", show, onClose, durati
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
+    <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 duration-300">
       <div className={`flex items-center p-4 rounded-lg border ${colors[type]} shadow-lg max-w-md`}>
         <div className="flex items-center">
           {icons[type]}

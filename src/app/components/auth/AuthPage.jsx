@@ -8,11 +8,13 @@ import AuthFooter from "@/components/auth/AuthFooter"
 import AuthDivider from "@/components/auth/AuthDivider"
 import LoginForm from "@/components/auth/LoginForm"
 import SignupForm from "@/components/auth/SignupForm"
+import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal"
 import Toast from "@/components/ui/toast"
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState("login")
   const [toast, setToast] = useState({ show: false, message: "", type: "success" })
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false)
 
   const handleSignupSuccess = () => {
     setActiveTab("login")
@@ -61,7 +63,11 @@ export default function AuthPage() {
               </TabsList>
 
               <TabsContent value="login" className="space-y-4">
-                <LoginForm onLoginSuccess={handleLoginSuccess} showToast={showToast} />
+                <LoginForm 
+                  onLoginSuccess={handleLoginSuccess} 
+                  showToast={showToast}
+                  onForgotPassword={() => setShowForgotPasswordModal(true)}
+                />
                 <AuthDivider />
               </TabsContent>
 
@@ -80,6 +86,12 @@ export default function AuthPage() {
           message={toast.message}
           type={toast.type}
           onClose={hideToast}
+        />
+
+        <ForgotPasswordModal
+          showModal={showForgotPasswordModal}
+          setShowModal={setShowForgotPasswordModal}
+          showToast={showToast}
         />
       </div>
     </div>

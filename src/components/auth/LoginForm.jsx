@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function LoginForm({ onLoginSuccess, showToast }) {
+export default function LoginForm({ onLoginSuccess, showToast, onForgotPassword }) {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoginLoading, setIsLoginLoading] = useState(false)
@@ -142,7 +142,13 @@ export default function LoginForm({ onLoginSuccess, showToast }) {
           <input type="checkbox" id="remember" className="w-4 h-4 rounded border-gray-700 bg-gray-800 text-white focus:ring-white focus:ring-2" />
           <Label htmlFor="remember" className="text-sm text-gray-300">Remember me</Label>
         </div>
-        <button type="button" className="text-sm text-white hover:underline">Forgot password?</button>
+        <button 
+          type="button" 
+          onClick={onForgotPassword}
+          className="text-sm text-white hover:underline"
+        >
+          Forgot password?
+        </button>
       </div>
 
       <Button 
