@@ -8,6 +8,10 @@ import bcrypt from "bcryptjs"
 export const authOptions = {
   // Only use PrismaAdapter for OAuth providers, not credentials
   // adapter: PrismaAdapter(prisma),
+  session: {
+    strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 1 day default, extended by remember me
+  },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -54,6 +58,7 @@ export const authOptions = {
           businessName: user.businessName,
           phone: user.phone,
           image: user.image,
+          rememberMe: credentials.rememberMe === 'true',
         }
       }
     }),
@@ -110,7 +115,27 @@ export const authOptions = {
       if (new URL(url).origin === baseUrl) return url
       return baseUrl
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session }) {
+      // Handle profile updates triggered by update() function
+      if (trigger === "update" && session) {
+        console.log("JWT callback - Profile update triggered:", session)
+        // Merge the updated session data into the token
+        token.firstName = session.firstName || token.firstName
+        token.lastName = session.lastName || token.lastName
+        token.businessName = session.businessName || token.businessName
+        token.phone = session.phone || token.phone
+        token.email = session.email || token.email
+        token.name = session.name || `${session.firstName || token.firstName} ${session.lastName || token.lastName}`.trim() || token.name
+        console.log("JWT callback - Token updated with:", {
+          firstName: token.firstName,
+          lastName: token.lastName,
+          businessName: token.businessName,
+          phone: token.phone,
+          email: token.email
+        })
+        return token
+      }
+      
       // Initial sign in
       if (account && user) {
         // For Google OAuth
@@ -135,6 +160,14 @@ export const authOptions = {
           token.phone = user.phone
           token.email = user.email
           token.image = user.image
+          token.rememberMe = user.rememberMe
+          
+          // Set token expiration based on remember me
+          if (user.rememberMe) {
+            token.exp = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
+          } else {
+            token.exp = Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 1 day
+          }
         }
       }
       return token

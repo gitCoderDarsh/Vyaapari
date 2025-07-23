@@ -54,7 +54,7 @@ export async function PUT(request) {
 
     // Parse the request body
     const body = await request.json()
-    const { firstName, lastName, businessName, phone } = body
+    const { firstName, lastName, businessName, phone, email } = body
 
     // Validate required fields
     if (!firstName || !lastName || !businessName) {
@@ -63,20 +63,51 @@ export async function PUT(request) {
       }, { status: 400 })
     }
 
+    // Validate email format if provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ 
+        error: "Invalid email format" 
+      }, { status: 400 })
+    }
+
+    // Check if email is already taken by another user (if email is being changed)
+    if (email) {
+      const existingUser = await prisma.user.findFirst({
+        where: { 
+          email: email,
+          NOT: { id: session.user.id }
+        }
+      })
+      
+      if (existingUser) {
+        return NextResponse.json({ 
+          error: "Email is already registered with another account" 
+        }, { status: 400 })
+      }
+    }
+
     console.log('Profile update - User ID:', session.user.id)
-    console.log('Profile update - Data:', { firstName, lastName, businessName, phone })
+    console.log('Profile update - Data:', { firstName, lastName, businessName, phone, email })
+
+    // Prepare update data
+    const updateData = {
+      firstName,
+      lastName,
+      businessName,
+      phone,
+      // Update the name field to reflect the new first and last name
+      name: `${firstName} ${lastName}`.trim()
+    }
+
+    // Only update email if provided
+    if (email) {
+      updateData.email = email
+    }
 
     // Update user in database
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
-      data: {
-        firstName,
-        lastName,
-        businessName,
-        phone,
-        // Update the name field to reflect the new first and last name
-        name: `${firstName} ${lastName}`.trim()
-      },
+      data: updateData,
       select: {
         id: true,
         firstName: true,

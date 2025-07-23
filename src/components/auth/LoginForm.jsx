@@ -16,6 +16,7 @@ export default function LoginForm({ onLoginSuccess, showToast, onForgotPassword 
     email: '',
     password: ''
   })
+  const [rememberMe, setRememberMe] = useState(false)
 
   // Handle input changes for login form
   const handleLoginChange = (e) => {
@@ -46,6 +47,7 @@ export default function LoginForm({ onLoginSuccess, showToast, onForgotPassword 
       const result = await signIn('credentials', {
         email: loginData.email,
         password: loginData.password,
+        rememberMe: rememberMe.toString(),
         redirect: false,
       })
 
@@ -63,6 +65,7 @@ export default function LoginForm({ onLoginSuccess, showToast, onForgotPassword 
           email: '',
           password: ''
         })
+        setRememberMe(false)
         // Show success toast and call callback
         if (showToast) showToast("Login successful! Redirecting to dashboard...", "success")
         if (onLoginSuccess) onLoginSuccess()
@@ -75,6 +78,7 @@ export default function LoginForm({ onLoginSuccess, showToast, onForgotPassword 
           email: '',
           password: ''
         })
+        setRememberMe(false)
         // Show success toast and call callback
         if (showToast) showToast("Welcome back! Redirecting to dashboard...", "success")
         if (onLoginSuccess) onLoginSuccess()
@@ -139,7 +143,13 @@ export default function LoginForm({ onLoginSuccess, showToast, onForgotPassword 
 
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <input type="checkbox" id="remember" className="w-4 h-4 rounded border-gray-700 bg-gray-800 text-white focus:ring-white focus:ring-2" />
+          <input 
+            type="checkbox" 
+            id="remember" 
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-700 bg-gray-800 text-white focus:ring-white focus:ring-2" 
+          />
           <Label htmlFor="remember" className="text-sm text-gray-300">Remember me</Label>
         </div>
         <button 
