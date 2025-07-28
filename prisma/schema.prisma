@@ -35,20 +35,38 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?   // For Google OAuth users
-  firstName     String?   // For manual signup users
-  lastName      String?   // For manual signup users
+  id            String      @id @default(cuid())
+  name          String?     // For Google OAuth users
+  firstName     String?     // For manual signup users
+  lastName      String?     // For manual signup users
   businessName  String?
-  email         String    @unique
+  email         String      @unique
   phone         String?
   password      String?
   emailVerified DateTime?
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @default(now())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now())
   accounts      Account[]
   sessions      Session[]
+  inventory     Inventory[] // Relation to inventory items
+}
+
+model Inventory {
+  id             String   @id @default(cuid())
+  userId         String   // Foreign key to User
+  itemName       String   // Product/item name
+  stockQuantity  Int      @default(0) // Current stock count
+  itemPrice      Decimal  @db.Decimal(10, 2) // Price per unit (required for inventory value)
+  customFields   Json?    // User-defined fields as JSON
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Relation to user
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Index for fast user-based queries
+  @@index([userId])
 }
 
 model VerificationToken {

@@ -16,6 +16,11 @@ export const authOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          scope: "openid email profile"
+        }
+      }
     }),
     CredentialsProvider({
       name: "credentials",
@@ -72,9 +77,13 @@ export const authOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile }) {
+      console.log('SignIn callback - Provider:', account?.provider)
+      console.log('SignIn callback - User:', user?.email)
+      
       // Handle Google sign in manually
       if (account?.provider === "google") {
         try {
+          console.log('Google OAuth - Processing sign in for:', user.email)
           // Check if user already exists
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email }
