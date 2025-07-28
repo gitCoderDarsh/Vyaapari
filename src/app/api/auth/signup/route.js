@@ -13,8 +13,19 @@ export async function POST(req) {
     const { firstName, lastName, businessName, email, phone, password } = body
 
     // Basic validation
-    if (!firstName || !email || !password || !phone || !businessName) {
-      return Response.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!firstName || !lastName || !email || !password || !phone || !businessName) {
+      return Response.json({ error: 'All fields are required' }, { status: 400 })
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return Response.json({ error: 'Invalid email format' }, { status: 400 })
+    }
+
+    // Password strength validation
+    if (password.length < 6) {
+      return Response.json({ error: 'Password must be at least 6 characters long' }, { status: 400 })
     }
 
     // Check if user already exists
@@ -28,18 +39,17 @@ export async function POST(req) {
 
     // Hash the password
     const hashedPassword = await hash(password, 10)
-    console.log('Signup - Original password:', password)
-    console.log('Signup - Hashed password:', hashedPassword)
+    // Note: Removed password logging for security reasons
     
     // Create new user
     const user = await prisma.user.create({
       data: {
         id: generateId(),
-        firstName,
-        lastName,
-        businessName,
-        email,
-        phone,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        businessName: businessName.trim(),
+        email: email.toLowerCase().trim(),
+        phone: phone.trim(),
         password: hashedPassword,
       },
     })
