@@ -8,6 +8,8 @@ import MobileMenu from "@/components/dashboard/MobileMenu"
 import Sidebar from "@/components/dashboard/Sidebar"
 import LogoutModal from "@/components/dashboard/LogoutModal"
 import AddItemModal from "@/components/inventory/AddItemModal"
+import EditItemModal from "@/components/inventory/EditItemModal"
+import DeleteItemModal from "@/components/inventory/DeleteItemModal"
 import Toast from "@/components/ui/toast"
 import { Package, Plus, Search, Filter } from "lucide-react"
 
@@ -19,6 +21,11 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState("Inventory")
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [selectedItemId, setSelectedItemId] = useState(null)
+  const [selectedItemName, setSelectedItemName] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
   const [inventoryData, setInventoryData] = useState({
     items: [],
     totalItems: 0,
@@ -64,6 +71,51 @@ export default function InventoryPage() {
   // Handle successful item addition
   const handleAddSuccess = () => {
     fetchInventory() // Refresh inventory data
+  }
+
+  // Handle edit item
+  const handleEditItem = (itemId) => {
+    setSelectedItemId(itemId)
+    setShowEditModal(true)
+  }
+
+  // Handle successful item edit
+  const handleEditSuccess = () => {
+    fetchInventory() // Refresh inventory data
+    setSelectedItemId(null)
+  }
+
+  // Handle delete item
+  const handleDeleteItem = (itemId, itemName) => {
+    setSelectedItemId(itemId)
+    setSelectedItemName(itemName)
+    setShowDeleteModal(true)
+  }
+
+  // Confirm delete item
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/inventory/${selectedItemId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        showToast('Item deleted successfully!', 'success')
+        fetchInventory() // Refresh inventory data
+        setShowDeleteModal(false)
+        setSelectedItemId(null)
+        setSelectedItemName('')
+      } else {
+        const result = await response.json()
+        showToast(`Failed to delete item: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      console.error('Delete item error:', error)
+      showToast('An error occurred while deleting the item', 'error')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   // Redirect if not authenticated
@@ -261,8 +313,18 @@ export default function InventoryPage() {
                             <td className="py-3 px-4">₹{(item.stockQuantity * Number(item.itemPrice)).toLocaleString()}</td>
                             <td className="py-3 px-4">
                               <div className="flex gap-2">
-                                <button className="text-blue-400 hover:text-blue-300 text-sm">Edit</button>
-                                <button className="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                <button 
+                                  onClick={() => handleEditItem(item.id)}
+                                  className="text-blue-400 hover:text-blue-300 text-sm"
+                                >
+                                  Edit
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteItem(item.id, item.itemName)}
+                                  className="text-red-400 hover:text-red-300 text-sm"
+                                >
+                                  Delete
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -288,6 +350,29 @@ export default function InventoryPage() {
         onClose={() => setShowAddModal(false)}
         onSuccess={handleAddSuccess}
         showToast={showToast}
+      />
+
+      <EditItemModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false)
+          setSelectedItemId(null)
+        }}
+        onSuccess={handleEditSuccess}
+        showToast={showToast}
+        itemId={selectedItemId}
+      />
+
+      <DeleteItemModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false)
+          setSelectedItemId(null)
+          setSelectedItemName('')
+        }}
+        onConfirm={handleConfirmDelete}
+        itemName={selectedItemName}
+        isLoading={isDeleting}
       />
 
       <Toast

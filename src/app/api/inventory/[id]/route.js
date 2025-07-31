@@ -12,7 +12,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { id } = params
+    const { id } = await params
 
     const item = await prisma.inventory.findFirst({
       where: { 
@@ -44,7 +44,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
     const { itemName, stockQuantity, itemPrice, customFields } = body
 
@@ -118,7 +118,7 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { id } = params
+    const { id } = await params
 
     // Check if item exists and belongs to user
     const existingItem = await prisma.inventory.findFirst({
