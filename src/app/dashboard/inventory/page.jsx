@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useSession, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import MobileHeader from "@/components/dashboard/MobileHeader"
@@ -11,7 +11,7 @@ import AddItemModal from "@/components/inventory/AddItemModal"
 import EditItemModal from "@/components/inventory/EditItemModal"
 import DeleteItemModal from "@/components/inventory/DeleteItemModal"
 import Toast from "@/components/ui/toast"
-import { Package, Plus, Search, Filter } from "lucide-react"
+import { Package, Plus, Search, Filter, Edit, Trash2, ChevronDown, ChevronRight } from "lucide-react"
 
 export default function InventoryPage() {
   const { data: session, status } = useSession()
@@ -33,6 +33,7 @@ export default function InventoryPage() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [toast, setToast] = useState({ show: false, message: "", type: "success" })
+  const [expandedRows, setExpandedRows] = useState(new Set())
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type })
@@ -40,6 +41,19 @@ export default function InventoryPage() {
 
   const hideToast = () => {
     setToast({ show: false, message: "", type: "success" })
+  }
+
+  // Toggle row expansion
+  const toggleRowExpansion = (itemId) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      return newSet
+    })
   }
 
   // Fetch inventory data
@@ -292,43 +306,83 @@ export default function InventoryPage() {
                           <th className="text-left py-3 px-4 font-medium text-gray-300">Price</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-300">Value</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-300">Actions</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300 w-10"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {inventoryData.items.map((item) => (
-                          <tr key={item.id} className="border-b border-gray-800 hover:bg-gray-800">
-                            <td className="py-3 px-4">{item.itemName}</td>
-                            <td className="py-3 px-4">
-                              <span className={`px-2 py-1 rounded text-sm ${
-                                item.stockQuantity === 0 
-                                  ? 'bg-red-900 text-red-200' 
-                                  : item.stockQuantity < 10 
-                                  ? 'bg-yellow-900 text-yellow-200' 
-                                  : 'bg-green-900 text-green-200'
-                              }`}>
-                                {item.stockQuantity}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4">₹{Number(item.itemPrice).toLocaleString()}</td>
-                            <td className="py-3 px-4">₹{(item.stockQuantity * Number(item.itemPrice)).toLocaleString()}</td>
-                            <td className="py-3 px-4">
-                              <div className="flex gap-2">
-                                <button 
-                                  onClick={() => handleEditItem(item.id)}
-                                  className="text-blue-400 hover:text-blue-300 text-sm"
-                                >
-                                  Edit
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteItem(item.id, item.itemName)}
-                                  className="text-red-400 hover:text-red-300 text-sm"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                        {inventoryData.items.map((item) => {
+                          const isExpanded = expandedRows.has(item.id)
+                          const hasCustomFields = item.customFields && Object.keys(item.customFields).length > 0
+                          
+                          return (
+                            <React.Fragment key={item.id}>
+                              <tr className={`hover:bg-gray-800 ${!isExpanded ? 'border-b border-gray-800' : ''}`}>
+                                <td className="py-3 px-4">{item.itemName}</td>
+                                <td className="py-3 px-4">
+                                  <span className={`px-2 py-1 rounded text-sm ${
+                                    item.stockQuantity === 0 
+                                      ? 'bg-red-900 text-red-200' 
+                                      : item.stockQuantity < 10 
+                                      ? 'bg-yellow-900 text-yellow-200' 
+                                      : 'bg-green-900 text-green-200'
+                                  }`}>
+                                    {item.stockQuantity}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">₹{Number(item.itemPrice).toLocaleString()}</td>
+                                <td className="py-3 px-4">₹{(item.stockQuantity * Number(item.itemPrice)).toLocaleString()}</td>
+                                <td className="py-3 px-4">
+                                  <div className="flex gap-2">
+                                    <button 
+                                      onClick={() => handleEditItem(item.id)}
+                                      className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-gray-700 transition-colors"
+                                      title="Edit item"
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteItem(item.id, item.itemName)}
+                                      className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-gray-700 transition-colors"
+                                      title="Delete item"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  {hasCustomFields && (
+                                    <button
+                                      onClick={() => toggleRowExpansion(item.id)}
+                                      className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition-colors"
+                                      title={isExpanded ? "Hide custom fields" : "Show custom fields"}
+                                    >
+                                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                              {isExpanded && hasCustomFields && (
+                                <tr className="border-b border-gray-800">
+                                  <td colSpan="6" className="py-3 px-4">
+                                    <div className="ml-4">
+                                      <div className="flex flex-wrap gap-2">
+                                        {Object.entries(item.customFields).map(([key, value]) => (
+                                          <span
+                                            key={key}
+                                            className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-700 text-gray-300"
+                                          >
+                                            <span className="font-medium">{key}:</span>
+                                            <span className="ml-1">{value}</span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
