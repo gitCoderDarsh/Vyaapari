@@ -7,6 +7,7 @@ import MobileHeader from "@/components/dashboard/MobileHeader"
 import MobileMenu from "@/components/dashboard/MobileMenu"
 import Sidebar from "@/components/dashboard/Sidebar"
 import LogoutModal from "@/components/dashboard/LogoutModal"
+import AddItemModal from "@/components/inventory/AddItemModal"
 import Toast from "@/components/ui/toast"
 import { Package, Plus, Search, Filter } from "lucide-react"
 
@@ -17,6 +18,13 @@ export default function InventoryPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("Inventory")
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [inventoryData, setInventoryData] = useState({
+    items: [],
+    totalItems: 0,
+    totalValue: 0
+  })
+  const [isLoading, setIsLoading] = useState(true)
   const [toast, setToast] = useState({ show: false, message: "", type: "success" })
 
   const showToast = (message, type = "success") => {
@@ -25,6 +33,37 @@ export default function InventoryPage() {
 
   const hideToast = () => {
     setToast({ show: false, message: "", type: "success" })
+  }
+
+  // Fetch inventory data
+  const fetchInventory = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/inventory')
+      if (response.ok) {
+        const data = await response.json()
+        setInventoryData(data)
+      } else {
+        showToast('Failed to fetch inventory', 'error')
+      }
+    } catch (error) {
+      console.error('Fetch inventory error:', error)
+      showToast('Error loading inventory', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Load inventory on component mount
+  useEffect(() => {
+    if (session?.user) {
+      fetchInventory()
+    }
+  }, [session])
+
+  // Handle successful item addition
+  const handleAddSuccess = () => {
+    fetchInventory() // Refresh inventory data
   }
 
   // Redirect if not authenticated
@@ -105,7 +144,10 @@ export default function InventoryPage() {
                 <h1 className="text-3xl font-bold">Inventory Management</h1>
                 <p className="text-gray-400 mt-2">Manage your business inventory and products</p>
               </div>
-              <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              >
                 <Plus size={20} />
                 Add Product
               </button>
@@ -135,7 +177,7 @@ export default function InventoryPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">Total Products</p>
-                    <p className="text-2xl font-bold">0</p>
+                    <p className="text-2xl font-bold">{inventoryData.totalItems}</p>
                   </div>
                   <Package className="text-blue-500" size={32} />
                 </div>
@@ -144,20 +186,22 @@ export default function InventoryPage() {
               <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">Low Stock</p>
-                    <p className="text-2xl font-bold text-yellow-500">0</p>
+                    <p className="text-gray-400 text-sm">Total Value</p>
+                    <p className="text-2xl font-bold">₹{inventoryData.totalValue.toLocaleString()}</p>
                   </div>
-                  <Package className="text-yellow-500" size={32} />
+                  <Package className="text-green-500" size={32} />
                 </div>
               </div>
               
               <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">Out of Stock</p>
-                    <p className="text-2xl font-bold text-red-500">0</p>
+                    <p className="text-gray-400 text-sm">Low Stock</p>
+                    <p className="text-2xl font-bold text-yellow-500">
+                      {inventoryData.items.filter(item => item.stockQuantity < 10).length}
+                    </p>
                   </div>
-                  <Package className="text-red-500" size={32} />
+                  <Package className="text-yellow-500" size={32} />
                 </div>
               </div>
             </div>
@@ -169,15 +213,64 @@ export default function InventoryPage() {
               </div>
               
               <div className="p-6">
-                <div className="text-center py-12">
-                  <Package className="mx-auto text-gray-600 mb-4" size={64} />
-                  <h3 className="text-xl font-semibold mb-2">No products yet</h3>
-                  <p className="text-gray-400 mb-6">Start by adding your first product to the inventory</p>
-                  <button className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors">
-                    <Plus size={20} />
-                    Add Your First Product
-                  </button>
-                </div>
+                {isLoading ? (
+                  <div className="text-center py-12">
+                    <div className="text-gray-400">Loading inventory...</div>
+                  </div>
+                ) : inventoryData.items.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Package className="mx-auto text-gray-600 mb-4" size={64} />
+                    <h3 className="text-xl font-semibold mb-2">No products yet</h3>
+                    <p className="text-gray-400 mb-6">Start by adding your first product to the inventory</p>
+                    <button 
+                      onClick={() => setShowAddModal(true)}
+                      className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors"
+                    >
+                      <Plus size={20} />
+                      Add Your First Product
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-800">
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">Item Name</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">Stock</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">Price</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">Value</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {inventoryData.items.map((item) => (
+                          <tr key={item.id} className="border-b border-gray-800 hover:bg-gray-800">
+                            <td className="py-3 px-4">{item.itemName}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-1 rounded text-sm ${
+                                item.stockQuantity === 0 
+                                  ? 'bg-red-900 text-red-200' 
+                                  : item.stockQuantity < 10 
+                                  ? 'bg-yellow-900 text-yellow-200' 
+                                  : 'bg-green-900 text-green-200'
+                              }`}>
+                                {item.stockQuantity}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">₹{Number(item.itemPrice).toLocaleString()}</td>
+                            <td className="py-3 px-4">₹{(item.stockQuantity * Number(item.itemPrice)).toLocaleString()}</td>
+                            <td className="py-3 px-4">
+                              <div className="flex gap-2">
+                                <button className="text-blue-400 hover:text-blue-300 text-sm">Edit</button>
+                                <button className="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -188,6 +281,13 @@ export default function InventoryPage() {
         showLogoutModal={showLogoutModal}
         setShowLogoutModal={setShowLogoutModal}
         handleLogout={handleLogout}
+      />
+
+      <AddItemModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={handleAddSuccess}
+        showToast={showToast}
       />
 
       <Toast
