@@ -56,6 +56,19 @@ export default function InventoryPage() {
     })
   }
 
+  // Handle row click for expansion
+  const handleRowClick = (e, item) => {
+    // Don't expand if clicking on action buttons
+    if (e.target.closest('button')) {
+      return
+    }
+    
+    const hasCustomFields = item.customFields && Object.keys(item.customFields).length > 0
+    if (hasCustomFields) {
+      toggleRowExpansion(item.id)
+    }
+  }
+
   // Fetch inventory data
   const fetchInventory = async () => {
     try {
@@ -306,7 +319,6 @@ export default function InventoryPage() {
                           <th className="text-left py-3 px-4 font-medium text-gray-300">Price</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-300">Value</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-300">Actions</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-300 w-10"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -316,8 +328,25 @@ export default function InventoryPage() {
                           
                           return (
                             <React.Fragment key={item.id}>
-                              <tr className={`hover:bg-gray-800 ${!isExpanded ? 'border-b border-gray-800' : ''}`}>
-                                <td className="py-3 px-4">{item.itemName}</td>
+                              <tr 
+                                className={`${!isExpanded ? 'border-b border-gray-800' : ''} ${
+                                  hasCustomFields 
+                                    ? 'hover:bg-gray-800 cursor-pointer' 
+                                    : 'hover:bg-gray-800'
+                                }`}
+                                onClick={(e) => handleRowClick(e, item)}
+                                title={hasCustomFields ? (isExpanded ? "Click to hide details" : "Click to show more details") : ""}
+                              >
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    {item.itemName}
+                                    {hasCustomFields && (
+                                      <span className="text-gray-500">
+                                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
                                 <td className="py-3 px-4">
                                   <span className={`px-2 py-1 rounded text-sm ${
                                     item.stockQuantity === 0 
@@ -334,14 +363,20 @@ export default function InventoryPage() {
                                 <td className="py-3 px-4">
                                   <div className="flex gap-2">
                                     <button 
-                                      onClick={() => handleEditItem(item.id)}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleEditItem(item.id)
+                                      }}
                                       className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-gray-700 transition-colors"
                                       title="Edit item"
                                     >
                                       <Edit size={16} />
                                     </button>
                                     <button 
-                                      onClick={() => handleDeleteItem(item.id, item.itemName)}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteItem(item.id, item.itemName)
+                                      }}
                                       className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-gray-700 transition-colors"
                                       title="Delete item"
                                     >
@@ -349,21 +384,10 @@ export default function InventoryPage() {
                                     </button>
                                   </div>
                                 </td>
-                                <td className="py-3 px-4">
-                                  {hasCustomFields && (
-                                    <button
-                                      onClick={() => toggleRowExpansion(item.id)}
-                                      className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition-colors"
-                                      title={isExpanded ? "Hide custom fields" : "Show custom fields"}
-                                    >
-                                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                    </button>
-                                  )}
-                                </td>
                               </tr>
                               {isExpanded && hasCustomFields && (
                                 <tr className="border-b border-gray-800">
-                                  <td colSpan="6" className="py-3 px-4">
+                                  <td colSpan="5" className="py-3 px-4">
                                     <div className="ml-4">
                                       <div className="flex flex-wrap gap-2">
                                         {Object.entries(item.customFields).map(([key, value]) => (
