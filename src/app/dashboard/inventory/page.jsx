@@ -35,6 +35,11 @@ export default function InventoryPage() {
   const [toast, setToast] = useState({ show: false, message: "", type: "success" })
   const [expandedRows, setExpandedRows] = useState(new Set())
   const [searchQuery, setSearchQuery] = useState("")
+  const [showFilterModal, setShowFilterModal] = useState(false)
+  const [filters, setFilters] = useState({
+    stockStatus: [], // ["inStock", "outOfStock", "lowStock"]
+    priceRange: []   // ["0to50", "51to100", "101to500", "501to1000", "above1000"]
+  })
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type })
@@ -182,10 +187,79 @@ export default function InventoryPage() {
     setSearchQuery(e.target.value)
   }
 
-  // Filter items based on search query
-  const filteredItems = inventoryData.items.filter(item =>
-    item.itemName.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Apply stock status filters
+  const applyStockFilters = (items) => {
+    if (filters.stockStatus.length === 0) return items
+    
+    return items.filter(item => {
+      const quantity = item.stockQuantity
+      
+      if (filters.stockStatus.includes("outOfStock") && quantity === 0) return true
+      if (filters.stockStatus.includes("lowStock") && quantity > 0 && quantity < 10) return true
+      if (filters.stockStatus.includes("inStock") && quantity >= 10) return true
+      
+      return false
+    })
+  }
+
+  // Apply price range filters
+  const applyPriceFilters = (items) => {
+    if (filters.priceRange.length === 0) return items
+    
+    return items.filter(item => {
+      const price = Number(item.itemPrice)
+      
+      if (filters.priceRange.includes("0to50") && price >= 0 && price <= 50) return true
+      if (filters.priceRange.includes("51to100") && price >= 51 && price <= 100) return true
+      if (filters.priceRange.includes("101to500") && price >= 101 && price <= 500) return true
+      if (filters.priceRange.includes("501to1000") && price >= 501 && price <= 1000) return true
+      if (filters.priceRange.includes("above1000") && price > 1000) return true
+      
+      return false
+    })
+  }
+
+  // Filter items based on search query and filters
+  const filteredItems = (() => {
+    let items = inventoryData.items
+    
+    // Apply search filter
+    if (searchQuery) {
+      items = items.filter(item =>
+        item.itemName.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+    
+    // Apply stock status filters
+    items = applyStockFilters(items)
+    
+    // Apply price range filters
+    items = applyPriceFilters(items)
+    
+    return items
+  })()
+
+  // Handle filter changes
+  const handleFilterChange = (filterType, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: prev[filterType].includes(value)
+        ? prev[filterType].filter(item => item !== value)
+        : [...prev[filterType], value]
+    }))
+  }
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setFilters({
+      stockStatus: [],
+      priceRange: []
+    })
+    setShowFilterModal(false)
+  }
+
+  // Check if any filters are active
+  const hasActiveFilters = filters.stockStatus.length > 0 || filters.priceRange.length > 0
 
   // Update inventory stats based on filtered items
   const filteredStats = {
@@ -194,6 +268,14 @@ export default function InventoryPage() {
       sum + (Number(item.stockQuantity) * Number(item.itemPrice)), 0
     ),
     lowStockItems: filteredItems.filter(item => item.stockQuantity < 10).length
+  }
+
+  // Get display text for stats
+  const getStatsLabel = (baseLabel) => {
+    if (searchQuery && hasActiveFilters) return `Filtered ${baseLabel}`
+    if (searchQuery) return `Search ${baseLabel}`
+    if (hasActiveFilters) return `Filtered ${baseLabel}`
+    return `Total ${baseLabel}`
   }
 
   // Show loading while checking authentication
@@ -274,9 +356,21 @@ export default function InventoryPage() {
                     </button>
                   )}
                 </div>
-                <button className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-700 transition-colors">
+                <button 
+                  onClick={() => setShowFilterModal(true)}
+                  className={`px-4 py-2 border rounded-lg flex items-center gap-2 transition-colors ${
+                    hasActiveFilters 
+                      ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700' 
+                      : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
+                  }`}
+                >
                   <Filter size={20} />
                   Filter
+                  {hasActiveFilters && (
+                    <span className="bg-white text-blue-600 text-xs px-1.5 py-0.5 rounded-full font-medium">
+                      {filters.stockStatus.length + filters.priceRange.length}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
@@ -287,7 +381,7 @@ export default function InventoryPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">
-                      {searchQuery ? "Filtered Products" : "Total Products"}
+                      {getStatsLabel("Products")}
                     </p>
                     <p className="text-2xl font-bold">{filteredStats.totalItems}</p>
                   </div>
@@ -299,7 +393,7 @@ export default function InventoryPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">
-                      {searchQuery ? "Filtered Value" : "Total Value"}
+                      {getStatsLabel("Value")}
                     </p>
                     <p className="text-2xl font-bold">₹{filteredStats.totalValue.toLocaleString()}</p>
                   </div>
@@ -348,13 +442,32 @@ export default function InventoryPage() {
                   <div className="text-center py-12">
                     <Package className="mx-auto text-gray-600 mb-4" size={64} />
                     <h3 className="text-xl font-semibold mb-2">No products found</h3>
-                    <p className="text-gray-400 mb-6">No products match your search "{searchQuery}"</p>
-                    <button 
-                      onClick={() => setSearchQuery("")}
-                      className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors"
-                    >
-                      Clear Search
-                    </button>
+                    <p className="text-gray-400 mb-6">
+                      {searchQuery && hasActiveFilters 
+                        ? `No products match your search "${searchQuery}" and current filters`
+                        : searchQuery 
+                        ? `No products match your search "${searchQuery}"`
+                        : "No products match the current filters"
+                      }
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                      {searchQuery && (
+                        <button 
+                          onClick={() => setSearchQuery("")}
+                          className="bg-gray-600 hover:bg-gray-700 px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                        >
+                          Clear Search
+                        </button>
+                      )}
+                      {hasActiveFilters && (
+                        <button 
+                          onClick={clearAllFilters}
+                          className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -506,6 +619,129 @@ export default function InventoryPage() {
         type={toast.type}
         onClose={hideToast}
       />
+
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-700">
+              <h2 className="text-xl font-semibold text-white">Filter Products</h2>
+              <button
+                onClick={() => setShowFilterModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Filter Content */}
+            <div className="p-6 space-y-6">
+              {/* Stock Status Filters */}
+              <div>
+                <h3 className="text-lg font-medium text-white mb-3">📦 Stock Status</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.stockStatus.includes("inStock")}
+                      onChange={() => handleFilterChange("stockStatus", "inStock")}
+                      className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">In Stock (≥10 items)</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.stockStatus.includes("lowStock")}
+                      onChange={() => handleFilterChange("stockStatus", "lowStock")}
+                      className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">Low Stock (1-9 items)</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.stockStatus.includes("outOfStock")}
+                      onChange={() => handleFilterChange("stockStatus", "outOfStock")}
+                      className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">Out of Stock (0 items)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Price Range Filters */}
+              <div>
+                <h3 className="text-lg font-medium text-white mb-3">💰 Price Range</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.priceRange.includes("0to50")}
+                      onChange={() => handleFilterChange("priceRange", "0to50")}
+                      className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">₹0 - ₹50</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.priceRange.includes("51to100")}
+                      onChange={() => handleFilterChange("priceRange", "51to100")}
+                      className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">₹51 - ₹100</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.priceRange.includes("101to500")}
+                      onChange={() => handleFilterChange("priceRange", "101to500")}
+                      className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">₹101 - ₹500</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.priceRange.includes("501to1000")}
+                      onChange={() => handleFilterChange("priceRange", "501to1000")}
+                      className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">₹501 - ₹1,000</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.priceRange.includes("above1000")}
+                      onChange={() => handleFilterChange("priceRange", "above1000")}
+                      className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-300">Above ₹1,000</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 p-6 border-t border-gray-700">
+              <button
+                onClick={clearAllFilters}
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-white"
+              >
+                Clear All
+              </button>
+              <button
+                onClick={() => setShowFilterModal(false)}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-white"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
