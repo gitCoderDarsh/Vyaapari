@@ -11,7 +11,7 @@ import AddItemModal from "@/components/inventory/AddItemModal"
 import EditItemModal from "@/components/inventory/EditItemModal"
 import DeleteItemModal from "@/components/inventory/DeleteItemModal"
 import Toast from "@/components/ui/toast"
-import { Package, Plus, Search, Filter, Edit, Trash2, ChevronDown, ChevronRight, X } from "lucide-react"
+import { Package, Plus, Search, Filter, Edit, Trash2, ChevronDown, ChevronRight, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 
 export default function InventoryPage() {
   const { data: session, status } = useSession()
@@ -39,6 +39,10 @@ export default function InventoryPage() {
   const [filters, setFilters] = useState({
     stockStatus: [], // ["inStock", "outOfStock", "lowStock"]
     priceRange: []   // ["0to50", "51to100", "101to500", "501to1000", "above1000"]
+  })
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: 'asc' // 'asc' or 'desc'
   })
 
   const showToast = (message, type = "success") => {
@@ -219,6 +223,44 @@ export default function InventoryPage() {
     })
   }
 
+  // Sort items based on sort configuration
+  const applySorting = (items) => {
+    if (!sortConfig.key) return items
+    
+    return [...items].sort((a, b) => {
+      let aValue, bValue
+      
+      switch (sortConfig.key) {
+        case 'name':
+          aValue = a.itemName.toLowerCase()
+          bValue = b.itemName.toLowerCase()
+          break
+        case 'stock':
+          aValue = Number(a.stockQuantity)
+          bValue = Number(b.stockQuantity)
+          break
+        case 'price':
+          aValue = Number(a.itemPrice)
+          bValue = Number(b.itemPrice)
+          break
+        case 'value':
+          aValue = Number(a.stockQuantity) * Number(a.itemPrice)
+          bValue = Number(b.stockQuantity) * Number(b.itemPrice)
+          break
+        default:
+          return 0
+      }
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'asc' ? -1 : 1
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'asc' ? 1 : -1
+      }
+      return 0
+    })
+  }
+
   // Filter items based on search query and filters
   const filteredItems = (() => {
     let items = inventoryData.items
@@ -235,6 +277,9 @@ export default function InventoryPage() {
     
     // Apply price range filters
     items = applyPriceFilters(items)
+    
+    // Apply sorting
+    items = applySorting(items)
     
     return items
   })()
@@ -256,6 +301,24 @@ export default function InventoryPage() {
       priceRange: []
     })
     setShowFilterModal(false)
+  }
+
+  // Handle sorting
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  // Get sort icon for column headers
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return <ArrowUpDown size={14} className="text-gray-500" />
+    }
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUp size={14} className="text-blue-400" />
+      : <ArrowDown size={14} className="text-blue-400" />
   }
 
   // Check if any filters are active
@@ -474,10 +537,42 @@ export default function InventoryPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-gray-800">
-                          <th className="text-left py-3 px-4 font-medium text-gray-300">Item Name</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-300">Stock</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-300">Price</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-300">Value</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">
+                            <button
+                              onClick={() => handleSort('name')}
+                              className="flex items-center gap-2 hover:text-white transition-colors"
+                            >
+                              Item Name
+                              {getSortIcon('name')}
+                            </button>
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">
+                            <button
+                              onClick={() => handleSort('stock')}
+                              className="flex items-center gap-2 hover:text-white transition-colors"
+                            >
+                              Stock
+                              {getSortIcon('stock')}
+                            </button>
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">
+                            <button
+                              onClick={() => handleSort('price')}
+                              className="flex items-center gap-2 hover:text-white transition-colors"
+                            >
+                              Price
+                              {getSortIcon('price')}
+                            </button>
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-300">
+                            <button
+                              onClick={() => handleSort('value')}
+                              className="flex items-center gap-2 hover:text-white transition-colors"
+                            >
+                              Value
+                              {getSortIcon('value')}
+                            </button>
+                          </th>
                           <th className="text-left py-3 px-4 font-medium text-gray-300">Actions</th>
                         </tr>
                       </thead>
