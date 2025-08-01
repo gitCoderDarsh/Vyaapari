@@ -11,7 +11,7 @@ import AddItemModal from "@/components/inventory/AddItemModal"
 import EditItemModal from "@/components/inventory/EditItemModal"
 import DeleteItemModal from "@/components/inventory/DeleteItemModal"
 import Toast from "@/components/ui/toast"
-import { Package, Plus, Search, Filter, Edit, Trash2, ChevronDown, ChevronRight } from "lucide-react"
+import { Package, Plus, Search, Filter, Edit, Trash2, ChevronDown, ChevronRight, X } from "lucide-react"
 
 export default function InventoryPage() {
   const { data: session, status } = useSession()
@@ -34,6 +34,7 @@ export default function InventoryPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [toast, setToast] = useState({ show: false, message: "", type: "success" })
   const [expandedRows, setExpandedRows] = useState(new Set())
+  const [searchQuery, setSearchQuery] = useState("")
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type })
@@ -176,6 +177,25 @@ export default function InventoryPage() {
     }, 1000)
   }
 
+  // Handle search input
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value)
+  }
+
+  // Filter items based on search query
+  const filteredItems = inventoryData.items.filter(item =>
+    item.itemName.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Update inventory stats based on filtered items
+  const filteredStats = {
+    totalItems: filteredItems.length,
+    totalValue: filteredItems.reduce((sum, item) => 
+      sum + (Number(item.stockQuantity) * Number(item.itemPrice)), 0
+    ),
+    lowStockItems: filteredItems.filter(item => item.stockQuantity < 10).length
+  }
+
   // Show loading while checking authentication
   if (status === "loading") {
     return (
@@ -240,8 +260,19 @@ export default function InventoryPage() {
                   <input
                     type="text"
                     placeholder="Search products..."
-                    className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
                   />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                      title="Clear search"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
                 </div>
                 <button className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-700 transition-colors">
                   <Filter size={20} />
@@ -255,8 +286,10 @@ export default function InventoryPage() {
               <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">Total Products</p>
-                    <p className="text-2xl font-bold">{inventoryData.totalItems}</p>
+                    <p className="text-gray-400 text-sm">
+                      {searchQuery ? "Filtered Products" : "Total Products"}
+                    </p>
+                    <p className="text-2xl font-bold">{filteredStats.totalItems}</p>
                   </div>
                   <Package className="text-blue-500" size={32} />
                 </div>
@@ -265,8 +298,10 @@ export default function InventoryPage() {
               <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">Total Value</p>
-                    <p className="text-2xl font-bold">₹{inventoryData.totalValue.toLocaleString()}</p>
+                    <p className="text-gray-400 text-sm">
+                      {searchQuery ? "Filtered Value" : "Total Value"}
+                    </p>
+                    <p className="text-2xl font-bold">₹{filteredStats.totalValue.toLocaleString()}</p>
                   </div>
                   <Package className="text-green-500" size={32} />
                 </div>
@@ -277,7 +312,7 @@ export default function InventoryPage() {
                   <div>
                     <p className="text-gray-400 text-sm">Low Stock</p>
                     <p className="text-2xl font-bold text-yellow-500">
-                      {inventoryData.items.filter(item => item.stockQuantity < 10).length}
+                      {filteredStats.lowStockItems}
                     </p>
                   </div>
                   <Package className="text-yellow-500" size={32} />
@@ -309,6 +344,18 @@ export default function InventoryPage() {
                       Add Your First Product
                     </button>
                   </div>
+                ) : filteredItems.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Package className="mx-auto text-gray-600 mb-4" size={64} />
+                    <h3 className="text-xl font-semibold mb-2">No products found</h3>
+                    <p className="text-gray-400 mb-6">No products match your search "{searchQuery}"</p>
+                    <button 
+                      onClick={() => setSearchQuery("")}
+                      className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors"
+                    >
+                      Clear Search
+                    </button>
+                  </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
@@ -322,7 +369,7 @@ export default function InventoryPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {inventoryData.items.map((item) => {
+                        {filteredItems.map((item) => {
                           const isExpanded = expandedRows.has(item.id)
                           const hasCustomFields = item.customFields && Object.keys(item.customFields).length > 0
                           
