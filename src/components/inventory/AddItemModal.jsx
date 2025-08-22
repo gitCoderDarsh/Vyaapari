@@ -1,17 +1,20 @@
 "use client"
 
 import { useState } from "react"
-import { X, Plus, Trash2 } from "lucide-react"
+import { X, Plus, Trash2, Sparkles, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { aiHelpers } from "@/lib/gemini"
 
 export default function AddItemModal({ isOpen, onClose, onSuccess, showToast }) {
   const [isLoading, setIsLoading] = useState(false)
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
   const [formData, setFormData] = useState({
     itemName: '',
     stockQuantity: 0,
-    itemPrice: 0
+    itemPrice: 0,
+    description: ''
   })
   const [customFields, setCustomFields] = useState([])
 
@@ -42,12 +45,45 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, showToast }) 
     setCustomFields(prev => prev.filter((_, i) => i !== index))
   }
 
+  // Generate AI description
+  const generateAIDescription = async () => {
+    if (!formData.itemName || !formData.itemPrice) {
+      showToast('Please enter item name and price first', 'error')
+      return
+    }
+
+    setIsGeneratingDescription(true)
+    try {
+      const response = await aiHelpers.generateDescription({
+        itemName: formData.itemName,
+        itemPrice: formData.itemPrice,
+        category: customFields.find(f => f.key.toLowerCase() === 'category')?.value || ''
+      })
+
+      if (response.success && response.text) {
+        setFormData(prev => ({
+          ...prev,
+          description: response.text
+        }))
+        showToast('AI description generated successfully!', 'success')
+      } else {
+        showToast('Could not generate description. Please try again.', 'error')
+      }
+    } catch (error) {
+      console.error('AI Description Error:', error)
+      showToast('Error generating description', 'error')
+    } finally {
+      setIsGeneratingDescription(false)
+    }
+  }
+
   // Reset form
   const resetForm = () => {
     setFormData({
       itemName: '',
       stockQuantity: 0,
-      itemPrice: 0
+      itemPrice: 0,
+      description: ''
     })
     setCustomFields([])
   }
@@ -188,6 +224,44 @@ export default function AddItemModal({ isOpen, onClose, onSuccess, showToast }) 
               onChange={(e) => handleInputChange('itemPrice', e.target.value)}
               required
             />
+          </div>
+
+          {/* AI Product Description */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="description" className="text-gray-300">
+                Product Description
+              </Label>
+              <Button
+                type="button"
+                onClick={generateAIDescription}
+                disabled={isGeneratingDescription || !formData.itemName || !formData.itemPrice}
+                className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-1 h-auto disabled:bg-gray-700 disabled:cursor-not-allowed"
+              >
+                {isGeneratingDescription ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-1" />
+                    AI Generate
+                  </>
+                )}
+              </Button>
+            </div>
+            <textarea
+              id="description"
+              placeholder="Enter product description or use AI to generate one"
+              className="w-full p-3 bg-gray-800 border border-gray-700 text-white placeholder:text-gray-500 focus:border-white rounded-md resize-none"
+              rows={3}
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+            />
+            <p className="text-xs text-gray-400">
+              💡 Fill in name and price, then click "AI Generate" for smart descriptions
+            </p>
           </div>
 
           {/* Custom Fields Section */}

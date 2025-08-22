@@ -11,6 +11,7 @@ import AddItemModal from "@/components/inventory/AddItemModal"
 import EditItemModal from "@/components/inventory/EditItemModal"
 import DeleteItemModal from "@/components/inventory/DeleteItemModal"
 import Toast from "@/components/ui/toast"
+import AIBusinessChatbot from "@/components/dashboard/AIBusinessChatbot"
 import { Package, Plus, Search, Filter, Edit, Trash2, ChevronDown, ChevronRight, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 
 export default function InventoryPage() {
@@ -319,6 +320,40 @@ export default function InventoryPage() {
     return sortConfig.direction === 'asc' 
       ? <ArrowUp size={14} className="text-blue-400" />
       : <ArrowDown size={14} className="text-blue-400" />
+  }
+
+  // Handle natural language search from AI chatbot
+  const handleNaturalSearch = (searchTerms) => {
+    if (searchTerms) {
+      // Handle different types of natural search
+      if (searchTerms.includes('price:under:')) {
+        const price = searchTerms.split(':')[2]
+        // Set price filter for items under specified price
+        setFilters(prev => ({
+          ...prev,
+          priceRange: price <= 50 ? ['0to50'] : 
+                     price <= 100 ? ['0to50', '51to100'] :
+                     price <= 500 ? ['0to50', '51to100', '101to500'] :
+                     ['0to50', '51to100', '101to500', '501to1000']
+        }))
+        showToast(`Filtered products under ₹${price}`, 'success')
+      } else if (searchTerms.includes('price:above:')) {
+        const price = searchTerms.split(':')[2]
+        // Set price filter for items above specified price
+        setFilters(prev => ({
+          ...prev,
+          priceRange: price >= 1000 ? ['above1000'] :
+                     price >= 500 ? ['501to1000', 'above1000'] :
+                     price >= 100 ? ['101to500', '501to1000', 'above1000'] :
+                     ['51to100', '101to500', '501to1000', 'above1000']
+        }))
+        showToast(`Filtered products above ₹${price}`, 'success')
+      } else {
+        // Regular search terms
+        setSearchQuery(searchTerms)
+        showToast(`Searching for: ${searchTerms}`, 'success')
+      }
+    }
   }
 
   // Check if any filters are active
@@ -837,6 +872,17 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
+
+      {/* AI Business Chatbot */}
+      <AIBusinessChatbot 
+        inventoryData={{
+          items: filteredItems,
+          totalItems: filteredStats.totalItems,
+          totalValue: filteredStats.totalValue,
+          lowStockItems: filteredStats.lowStockItems
+        }}
+        onNaturalSearch={handleNaturalSearch}
+      />
     </div>
   )
 }

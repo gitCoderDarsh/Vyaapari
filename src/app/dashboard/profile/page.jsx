@@ -113,7 +113,20 @@ export default function ProfilePage() {
     setShowModal(true)
   }
 
+  // Add validation to ensure required fields are filled before updating
+  const isFormValid = () => {
+    if (!editData.firstName.trim() || !editData.lastName.trim() || !editData.businessName.trim()) {
+      showToast("First name, last name, and business name are required.", "error");
+      return false;
+    }
+    return true;
+  };
+
   const handleModalConfirm = async () => {
+    if (!isFormValid()) {
+      return; // Prevent API call if form is invalid
+    }
+
     setIsUpdating(true)
     
     try {
