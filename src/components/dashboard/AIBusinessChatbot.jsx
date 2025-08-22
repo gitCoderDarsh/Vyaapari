@@ -2,7 +2,29 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { MessageCircle, Send, X, Loader2, Search, TrendingUp, DollarSign, HelpCircle } from 'lucide-react'
-import { geminiService, aiHelpers } from '@/lib/gemini'
+
+// Helper function to call AI API
+const callAI = async (type, prompt, data = {}) => {
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, prompt, data })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status}`)
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('AI API call failed:', error)
+    return { 
+      success: false, 
+      text: "I'm having trouble connecting to the AI service. Please try again." 
+    }
+  }
+}
 
 export default function AIBusinessChatbot({ inventoryData = {}, onNaturalSearch }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -120,7 +142,9 @@ What would you like to know about your business?`,
         case 'search':
           // Natural language search
           if (onNaturalSearch) {
-            response = await aiHelpers.searchHelp(messageText, inventoryData.items || [])
+            response = await callAI('search-help', messageText, {
+              productNames: inventoryData.items?.map(item => item.itemName) || []
+            })
             
             // Also trigger actual search if possible
             const searchTerms = extractSearchTerms(messageText)
@@ -135,37 +159,49 @@ What would you like to know about your business?`,
 
         case 'analysis':
           // Business insights
-          response = await aiHelpers.getInsights({
-            totalItems: inventoryData.totalItems || 0,
-            totalValue: inventoryData.totalValue || 0,
-            lowStockItems: inventoryData.lowStockItems || 0
+          response = await callAI('analyze-inventory', '', {
+            stats: {
+              totalItems: inventoryData.totalItems || 0,
+              totalValue: inventoryData.totalValue || 0,
+              lowStockItems: inventoryData.lowStockItems || 0
+            },
+            inventoryItems: inventoryData.items || [] // Pass actual inventory items
           })
           break
 
         case 'pricing':
           // Pricing advice
-          response = await geminiService.businessAssistant(messageText, {
-            totalItems: inventoryData.totalItems,
-            totalValue: inventoryData.totalValue,
-            lowStockItems: inventoryData.lowStockItems
+          response = await callAI('business-assistant', messageText, {
+            context: {
+              totalItems: inventoryData.totalItems,
+              totalValue: inventoryData.totalValue,
+              lowStockItems: inventoryData.lowStockItems
+            },
+            inventoryItems: inventoryData.items || [] // Pass actual inventory items
           })
           break
 
         case 'guidance':
           // Business guidance
-          response = await aiHelpers.askAssistant(messageText, {
-            totalItems: inventoryData.totalItems,
-            totalValue: inventoryData.totalValue,
-            lowStockItems: inventoryData.lowStockItems
+          response = await callAI('business-assistant', messageText, {
+            context: {
+              totalItems: inventoryData.totalItems,
+              totalValue: inventoryData.totalValue,
+              lowStockItems: inventoryData.lowStockItems
+            },
+            inventoryItems: inventoryData.items || [] // Pass actual inventory items
           })
           break
 
         default:
           // General conversation
-          response = await geminiService.businessAssistant(messageText, {
-            totalItems: inventoryData.totalItems,
-            totalValue: inventoryData.totalValue,
-            lowStockItems: inventoryData.lowStockItems
+          response = await callAI('business-assistant', messageText, {
+            context: {
+              totalItems: inventoryData.totalItems,
+              totalValue: inventoryData.totalValue,
+              lowStockItems: inventoryData.lowStockItems
+            },
+            inventoryItems: inventoryData.items || [] // Pass actual inventory items
           })
       }
 
