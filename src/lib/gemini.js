@@ -84,8 +84,11 @@ class GeminiService {
         timestamp: new Date().toISOString()
       })
       
+      // Format the response to be concise and practical
+      const formattedText = this.formatInventoryManagerResponse(text || 'No response generated')
+      
       return {
-        text: text || 'No response generated',
+        text: formattedText,
         success: true
       }
     } catch (error) {
@@ -137,6 +140,122 @@ class GeminiService {
         error: error.message
       }
     }
+  }
+
+  // Format Gemini responses to be concise and practical for inventory management
+  formatInventoryManagerResponse(rawResponse) {
+    console.log('🎨 [VS CODE] Formatting Gemini response for inventory manager style')
+    
+    let formatted = rawResponse
+    
+    // Remove markdown headers and excessive formatting
+    formatted = formatted.replace(/#{1,6}\s+/g, '') // Remove ### headers
+    formatted = formatted.replace(/\*\*\*\*/g, '') // Remove ****
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold** but keep text
+    formatted = formatted.replace(/\*(.*?)\*/g, '$1') // Remove *italic* but keep text
+    
+    // Split into sentences/sections for processing
+    const sections = formatted.split(/\n\s*\n+/) // Split on double line breaks
+    
+    // Process each section
+    const processedSections = sections.map(section => {
+      section = section.trim()
+      if (!section) return ''
+      
+      // Convert long paragraphs to bullet points
+      if (section.length > 150 && !section.includes('•') && !section.includes('-')) {
+        // Split long sentences and convert to bullets
+        const sentences = section.split(/\.\s+/)
+        if (sentences.length > 2) {
+          return sentences
+            .filter(s => s.trim().length > 10)
+            .slice(0, 4) // Max 4 points
+            .map(s => `• ${s.trim().replace(/\.$/, '')}`)
+            .join('\n')
+        }
+      }
+      
+      // Clean up existing bullet points
+      section = section.replace(/^\s*[-*•]\s*/gm, '• ')
+      
+      return section
+    }).filter(s => s.length > 0)
+    
+    // Join sections with single line breaks
+    let result = processedSections.join('\n\n')
+    
+    // Apply inventory manager tone and structure
+    result = this.applyInventoryManagerTone(result)
+    
+    // Final cleanup
+    result = result.replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
+    result = result.replace(/•\s*•/g, '•') // Remove duplicate bullets
+    result = result.trim()
+    
+    // Ensure maximum length (truncate if too long)
+    if (result.length > 800) {
+      const lines = result.split('\n')
+      let truncated = ''
+      let currentLength = 0
+      
+      for (const line of lines) {
+        if (currentLength + line.length > 800) break
+        truncated += line + '\n'
+        currentLength += line.length + 1
+      }
+      
+      result = truncated.trim()
+      if (!result.endsWith('.')) {
+        result += '...'
+      }
+    }
+    
+    console.log('🎨 [VS CODE] Response formatted:', {
+      originalLength: rawResponse.length,
+      formattedLength: result.length,
+      bulletPoints: (result.match(/•/g) || []).length
+    })
+    
+    return result
+  }
+
+  // Apply inventory manager specific tone and phrasing
+  applyInventoryManagerTone(text) {
+    // Replace consultant-speak with practical language
+    const replacements = [
+      [/consider implementing/gi, 'try'],
+      [/you should consider/gi, 'you could'],
+      [/it is recommended that/gi, 'try to'],
+      [/analysis suggests/gi, 'looks like'],
+      [/comprehensive strategy/gi, 'plan'],
+      [/implementation plan/gi, 'next steps'],
+      [/market analysis indicates/gi, 'market shows'],
+      [/strategic approach/gi, 'approach'],
+      [/optimization opportunities/gi, 'ways to improve'],
+      [/key considerations include/gi, 'think about'],
+      [/moving forward/gi, 'next']
+    ]
+    
+    let result = text
+    replacements.forEach(([pattern, replacement]) => {
+      result = result.replace(pattern, replacement)
+    })
+    
+    // Add practical action words at the start if missing
+    if (!result.match(/^(start|try|focus|avoid|check|test|action)/i)) {
+      // Check if it starts with a product recommendation
+      if (result.match(/^(your|the|this)/i)) {
+        // Good, it's already direct
+      } else if (result.includes('•')) {
+        // Has bullet points, add a brief intro
+        const firstBullet = result.indexOf('•')
+        if (firstBullet > 50) {
+          result = result.substring(firstBullet) // Start with bullets
+        }
+      }
+    }
+    
+    return result
   }
 
   // Add a method to list available models
@@ -338,21 +457,16 @@ Keep response brief, helpful, and focused on improving their search experience.`
         }).join('\n')
       : 'No specific items available'
 
-    const prompt = `You are a business assistant for inventory management. Answer this question:
+    // Detect if this is a strategic business question vs general analysis
+    const isStrategicQuestion = this.isStrategicBusinessQuestion(question)
+    
+    const prompt = isStrategicQuestion 
+      ? this.buildStrategicPrompt(question, inventoryContext, itemsList)
+      : this.buildGeneralPrompt(question, inventoryContext, itemsList)
 
-Question: "${question}"
-
-Inventory Context:
-- Total Items: ${inventoryContext.totalItems || 'Unknown'}
-- Total Value Range: ${this.getValueRange(inventoryContext.totalValue)}
-- Low Stock: ${inventoryContext.lowStockItems || 'Unknown'} items
-
-Current Inventory Items (sanitized):
-${itemsList}
-
-Based on the product categories and general pricing patterns above, provide practical business advice. Focus on market domain analysis and growth suggestions. Keep response concise and actionable.`
-
+    console.log('💬 Business assistant query type:', isStrategicQuestion ? 'Strategic Business' : 'General Analysis')
     console.log('💬 Business assistant query:', question)
+    
     const result = await this.generateContent(prompt)
     
     if (!result.success) {
@@ -363,6 +477,81 @@ Based on the product categories and general pricing patterns above, provide prac
     }
     
     return result
+  }
+
+  // Helper method to detect strategic vs analytical questions
+  isStrategicBusinessQuestion(question) {
+    const strategicKeywords = [
+      'sell', 'selling', 'distribute', 'distribution', 'pack', 'bundle', 'strategy',
+      'pricing strategy', 'market', 'expand', 'growth', 'business model',
+      'customers', 'negotiate', 'wholesale', 'retail', 'profit margin',
+      'thinking', 'plan', 'start by', 'what if', 'should i', 'considering',
+      'retailer', 'distributor', 'nonnegotiable'
+    ]
+    
+    const questionLower = question.toLowerCase()
+    const hasKeywords = strategicKeywords.some(keyword => questionLower.includes(keyword))
+    const isLongQuestion = question.length > 50
+    
+    console.log('🧠 [Strategic Detection]:', {
+      question: question.substring(0, 100) + '...',
+      hasKeywords,
+      isLongQuestion,
+      isStrategic: hasKeywords || isLongQuestion,
+      matchedKeywords: strategicKeywords.filter(k => questionLower.includes(k))
+    })
+    
+    return hasKeywords || isLongQuestion
+  }
+
+  // Build prompt for strategic business questions
+  buildStrategicPrompt(question, inventoryContext, itemsList) {
+    return `You are an experienced Inventory Manager Assistant helping a distributor/retailer manage their business. 
+
+BUSINESS OWNER'S QUESTION: "${question}"
+
+THEIR CURRENT SITUATION:
+- Managing ${inventoryContext.totalItems || 'multiple'} different products
+- Total inventory value: ${this.getValueRange(inventoryContext.totalValue)}
+- Items needing attention: ${inventoryContext.lowStockItems || 0} low stock items
+
+CURRENT PRODUCT PORTFOLIO:
+${itemsList}
+
+RESPONSE REQUIREMENTS:
+- Act as a helpful assistant, NOT a consultant writing reports
+- Keep responses under 6 bullet points maximum
+- Be specific and actionable - no vague advice
+- Use simple language like talking to a business owner
+- Focus on their exact question/strategy
+- No markdown headers (###) or bold formatting (**)
+- Give concrete next steps they can take today
+
+Answer their question directly with practical advice for their specific situation.`
+  }
+
+  // Build prompt for general inventory questions
+  buildGeneralPrompt(question, inventoryContext, itemsList) {
+    return `You are an Inventory Manager Assistant helping with day-to-day business operations.
+
+Question: "${question}"
+
+Current Inventory:
+- Total Items: ${inventoryContext.totalItems || 'Unknown'}
+- Total Value: ${this.getValueRange(inventoryContext.totalValue)}
+- Low Stock: ${inventoryContext.lowStockItems || 'Unknown'} items
+
+Product List:
+${itemsList}
+
+RESPONSE STYLE:
+- Keep answers short and practical
+- Use bullet points (max 5 points)
+- No markdown formatting (### or **)
+- Give specific actions, not general advice
+- Talk like a helpful assistant, not a consultant
+
+Provide practical advice based on their current inventory.`
   }
 
   // Privacy helper methods - sanitize data before sending to external AI

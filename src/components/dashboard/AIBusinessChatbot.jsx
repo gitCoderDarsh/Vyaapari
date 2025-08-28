@@ -34,10 +34,10 @@ export default function AIBusinessChatbot({ inventoryData = {}, onNaturalSearch 
       type: 'bot',
       content: `👋 Hi! I'm your AI business assistant for Vyaapari. I can help you with:
 
-🔍 **Natural Language Search** - "Show me cheap items under ₹500"
-📊 **Business Analysis** - "What products are selling slow?"
-💰 **Pricing Advice** - "Is my pricing competitive?"
-📈 **Growth Tips** - "How to optimize my inventory?"
+🔍 Natural Language Search - "Show me cheap items under ₹500"
+📊 Business Analysis - "What products are selling slow?"  
+💰 Pricing Advice - "Is my pricing competitive?"
+📈 Growth Tips - "How to optimize my inventory?"
 
 What would you like to know about your business?`,
       timestamp: new Date()
@@ -87,6 +87,17 @@ What would you like to know about your business?`,
   const detectIntent = (message) => {
     const lowerMessage = message.toLowerCase()
     
+    // Strategic business questions (highest priority - must be first)
+    if (lowerMessage.includes('distribute') || lowerMessage.includes('distribution') ||
+        lowerMessage.includes('pack') || lowerMessage.includes('bundle') ||
+        lowerMessage.includes('strategy') || lowerMessage.includes('thinking') ||
+        lowerMessage.includes('plan') || lowerMessage.includes('start by') ||
+        lowerMessage.includes('what if') || lowerMessage.includes('considering') ||
+        lowerMessage.includes('nonnegotiable') || lowerMessage.includes('wholesale') ||
+        (lowerMessage.includes('selling') && lowerMessage.length > 50)) {
+      return 'guidance' // Route to business-assistant for strategic questions
+    }
+    
     // Natural language search patterns
     if (lowerMessage.includes('find') || lowerMessage.includes('search') || 
         lowerMessage.includes('show me') || lowerMessage.includes('cheap') ||
@@ -95,25 +106,25 @@ What would you like to know about your business?`,
       return 'search'
     }
     
-    // Business analysis patterns
-    if (lowerMessage.includes('analyze') || lowerMessage.includes('insights') ||
-        lowerMessage.includes('trends') || lowerMessage.includes('selling') ||
-        lowerMessage.includes('slow') || lowerMessage.includes('fast') ||
-        lowerMessage.includes('business') || lowerMessage.includes('performance')) {
+    // Business analysis patterns (only for specific analysis requests)
+    if ((lowerMessage.includes('analyze') && lowerMessage.includes('inventory')) ||
+        lowerMessage.includes('insights') || lowerMessage.includes('trends') ||
+        lowerMessage.includes('performance') || lowerMessage.includes('slow') ||
+        lowerMessage.includes('fast') || lowerMessage.includes('overview')) {
       return 'analysis'
     }
     
     // Pricing patterns
     if (lowerMessage.includes('price') || lowerMessage.includes('pricing') ||
-        lowerMessage.includes('cost') || lowerMessage.includes('expensive') ||
-        lowerMessage.includes('cheap') || lowerMessage.includes('competitive')) {
+        lowerMessage.includes('cost') || lowerMessage.includes('competitive')) {
       return 'pricing'
     }
     
-    // Help/guidance patterns
+    // Help/guidance patterns (general business questions)
     if (lowerMessage.includes('help') || lowerMessage.includes('how') ||
         lowerMessage.includes('should') || lowerMessage.includes('advice') ||
-        lowerMessage.includes('recommend') || lowerMessage.includes('suggest')) {
+        lowerMessage.includes('recommend') || lowerMessage.includes('suggest') ||
+        lowerMessage.includes('business') || lowerMessage.includes('selling')) {
       return 'guidance'
     }
     
