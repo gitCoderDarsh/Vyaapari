@@ -165,6 +165,7 @@ export default function InventoryPage() {
 
   const navItems = [
     { name: "Inventory", icon: "Package", active: true },
+    { name: "Assistant", icon: "Bot", active: false },
     { name: "Profile", icon: "User", active: false },
   ]
 
@@ -173,6 +174,8 @@ export default function InventoryPage() {
       setShowLogoutModal(true)
     } else if (itemName === "Inventory") {
       router.push("/dashboard/inventory")
+    } else if (itemName === "Assistant") {
+      router.push("/dashboard/assistant")
     } else if (itemName === "Profile") {
       router.push("/dashboard/profile")
     }
@@ -412,6 +415,7 @@ export default function InventoryPage() {
           activeTab={activeTab}
           handleNavClick={handleNavClick}
           setShowLogoutModal={setShowLogoutModal}
+          isCollapsed={false}
         />
 
         {/* Main Content */}

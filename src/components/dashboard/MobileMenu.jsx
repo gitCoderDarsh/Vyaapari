@@ -1,11 +1,12 @@
 "use client"
 
-import { X, User, Package, LogOut } from "lucide-react"
+import { X, User, Package, LogOut, Bot } from "lucide-react"
 
 const iconMap = {
   User,
   Package,
-  LogOut
+  LogOut,
+  Bot
 }
 
 export default function MobileMenu({ 
@@ -43,7 +44,7 @@ export default function MobileMenu({
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                     item.name === activeTab
-                      ? "bg-white text-black font-semibold"
+                      ? "bg-blue-600 text-white font-semibold hover:bg-blue-700"
                       : "bg-gray-800 text-gray-300 hover:bg-gray-700"
                   }`}
                 >
