@@ -448,6 +448,14 @@ Keep response brief, helpful, and focused on improving their search experience.`
       }
     }
 
+    // Check for unclear or incomplete messages
+    if (this.isUnclearMessage(question)) {
+      return {
+        text: `**I'm not quite sure what you're asking.** 🤔\n\nCould you please provide more details? For example:\n\n• Ask about specific products or inventory\n• Request business insights or analysis\n• Ask for help with pricing or stock management\n\nTry rephrasing your question with more context so I can give you a helpful answer!`,
+        success: true
+      }
+    }
+
     // Prepare inventory items for analysis (sanitized for privacy)
     const inventoryItems = inventoryContext.inventoryItems || []
     const itemsList = inventoryItems.length > 0 
@@ -477,6 +485,29 @@ Keep response brief, helpful, and focused on improving their search experience.`
     }
     
     return result
+  }
+
+  // Helper method to detect unclear or incomplete messages
+  isUnclearMessage(question) {
+    const trimmed = question.trim().toLowerCase()
+    
+    // Very short messages
+    if (trimmed.length < 3) return true
+    
+    // Common unclear patterns
+    const unclearPatterns = [
+      /^(hi|hello|hey|yo|sup)$/,
+      /^(what|how|why|when|where)$/,
+      /^(ok|okay|yes|no|maybe)$/,
+      /^(help|\?|!)$/,
+      /^(tell me|show me|give me)$/,
+      /^(i want|i need|can you)$/,
+      /^(what about|how about)$/,
+      /^[a-z]{1,2}$/,  // Single or double letter messages
+      /^[^a-z]*$/,     // Only punctuation/numbers
+    ]
+    
+    return unclearPatterns.some(pattern => pattern.test(trimmed))
   }
 
   // Helper method to detect strategic vs analytical questions
@@ -520,14 +551,29 @@ ${itemsList}
 
 RESPONSE REQUIREMENTS:
 - Act as a helpful assistant, NOT a consultant writing reports
-- Keep responses under 6 bullet points maximum
-- Be specific and actionable - no vague advice
-- Use simple language like talking to a business owner
+- Structure your response with clear sections and formatting
+- Use **bold text** for key points and action items
+- Use bullet points (•) for lists and sub-points
+- Use numbered lists (1., 2., 3.) for sequential steps
+- Keep sections concise but well-organized
+- Use simple headings like "Key Insights:" or "Action Items:"
 - Focus on their exact question/strategy
-- No markdown headers (###) or bold formatting (**)
 - Give concrete next steps they can take today
 
-Answer their question directly with practical advice for their specific situation.`
+EXAMPLE FORMAT:
+**Current Situation:**
+• Your inventory shows...
+
+**Key Insights:**
+• Point 1 with **important details**
+• Point 2 with actionable advice
+
+**Recommended Actions:**
+1. **Immediate:** Do this first
+2. **This week:** Follow up with this
+3. **Long-term:** Consider this strategy
+
+Format your response for easy scanning with clear structure and emphasis on actionable insights.`
   }
 
   // Build prompt for general inventory questions
@@ -545,13 +591,16 @@ Product List:
 ${itemsList}
 
 RESPONSE STYLE:
-- Keep answers short and practical
-- Use bullet points (max 5 points)
-- No markdown formatting (### or **)
+- Structure responses with clear sections for easy scanning
+- Use **bold text** for important points and numbers
+- Use bullet points (•) for lists and recommendations
+- Use numbered steps (1., 2., 3.) for action sequences
+- Include section headers like "Current Status:" or "Recommendations:"
+- Keep answers practical and actionable
 - Give specific actions, not general advice
 - Talk like a helpful assistant, not a consultant
 
-Provide practical advice based on their current inventory.`
+Provide well-formatted, scannable advice based on their current inventory.`
   }
 
   // Privacy helper methods - sanitize data before sending to external AI

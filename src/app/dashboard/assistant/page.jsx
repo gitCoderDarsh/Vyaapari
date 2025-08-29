@@ -1,13 +1,69 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Edit, Plus, Send } from "lucide-react"
+import { Edit, Plus, Send, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import Sidebar from "@/components/dashboard/Sidebar"
+
+// Helper function to format AI responses with better structure
+const formatMessage = (text) => {
+  if (!text) return ''
+  
+  // Clean up the text first and split into lines
+  const lines = text.trim().split('\n')
+  const formattedLines = []
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim()
+    
+    // Skip empty lines at the beginning
+    if (line === '' && formattedLines.length === 0) continue
+    
+    // Handle empty lines (spacing)
+    if (line === '') {
+      formattedLines.push('<div class="mb-3"></div>')
+      continue
+    }
+    
+    // Bold text
+    line = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+    
+    // Section headers (words ending with :)
+    if (/^[A-Za-z\s]+:$/.test(line)) {
+      formattedLines.push(`<div class="text-blue-400 font-semibold mt-4 mb-2 text-sm uppercase tracking-wide">${line}</div>`)
+    }
+    // Bullet points
+    else if (/^[•·\-*]\s+/.test(line)) {
+      const content = line.replace(/^[•·\-*]\s+/, '')
+      formattedLines.push(`<div class="ml-4 mb-2 flex items-start"><span class="text-blue-400 mr-2 mt-1">•</span><span class="text-gray-300 flex-1">${content}</span></div>`)
+    }
+    // Numbered lists
+    else if (/^\d+\.\s+/.test(line)) {
+      const [, number, content] = line.match(/^(\d+\.)\s+(.+)$/)
+      formattedLines.push(`<div class="ml-4 mb-2 flex items-start"><span class="text-blue-400 font-medium mr-2 min-w-[20px]">${number}</span><span class="text-gray-300 flex-1">${content}</span></div>`)
+    }
+    // Regular text
+    else {
+      formattedLines.push(`<div class="mb-1">${line}</div>`)
+    }
+  }
+  
+  let result = formattedLines.join('')
+  
+  // Apply additional formatting
+  result = result
+    // Currency amounts
+    .replace(/₹([\d,]+)/g, '<span class="text-green-400 font-medium">₹$1</span>')
+    // Numbers and percentages
+    .replace(/\b(\d+%)\b/g, '<span class="text-yellow-400 font-medium">$1</span>')
+    // Action words
+    .replace(/\b(Action|TODO|Next|Immediate|Priority|Recommend|Consider)\b/gi, '<span class="text-orange-400 font-medium">$1</span>')
+  
+  return result
+}
 import MobileHeader from "@/components/dashboard/MobileHeader"
 import LogoutModal from "@/components/dashboard/LogoutModal"
 import styles from './assistant.module.css'
@@ -15,10 +71,41 @@ import styles from './assistant.module.css'
 export default function AssistantPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const textareaRef = useRef(null)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("Assistant")
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Add custom scrollbar styles
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.textContent = `
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #4b5563;
+        border-radius: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #6b7280;
+      }
+      .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #4b5563 transparent;
+      }
+    `
+    document.head.appendChild(style)
+    
+    return () => {
+      document.head.removeChild(style)
+    }
+  }, [])
   
   // Handle sidebar collapse animation when entering Assistant page
   useEffect(() => {
@@ -44,12 +131,18 @@ export default function AssistantPage() {
     {
       id: "1",
       name: "Inventory Help",
-      messages: [{ role: "assistant", content: "How can I help you with your inventory today?" }],
+      messages: [{ 
+        role: "assistant", 
+        content: "**Welcome to your AI Business Assistant!** 🤖\n\nI'm powered by Google Gemini and can help you with:\n\n• **Inventory Analysis** - Get insights on stock levels and trends\n• **Business Strategy** - Pricing recommendations and growth advice\n• **Product Questions** - Detailed analysis of your product portfolio\n• **Action Items** - Concrete steps to improve your business\n\nI have access to your current inventory data to provide **personalized recommendations**. What would you like to explore today?" 
+      }],
     },
     {
       id: "2",
       name: "Product Questions",
-      messages: [{ role: "assistant", content: "I'm here to answer any product-related questions." }],
+      messages: [{ 
+        role: "assistant", 
+        content: "**Product Analysis & Strategy** 📊\n\nI can help you with:\n\n1. **Pricing Analysis** - Optimize your product prices\n2. **Inventory Trends** - Identify fast-moving vs slow-moving items\n3. **Stock Management** - Get alerts for low stock items\n4. **Market Positioning** - Strategic advice for your products\n\nAsk me anything about your business or specific products!" 
+      }],
     },
   ])
   const [activeChat, setActiveChat] = useState("1")
@@ -100,43 +193,146 @@ export default function AssistantPage() {
     const newChat = {
       id: Date.now().toString(),
       name: `Chat ${chats.length + 1}`,
-      messages: [{ role: "assistant", content: "Hello! How can I assist you today?" }],
+      messages: [{ 
+        role: "assistant", 
+        content: "**Hello! I'm your AI Business Assistant** 🚀\n\nKey Capabilities:\n\n• **Inventory Analysis** - Real-time insights from your data\n• **Strategic Advice** - Business growth recommendations\n• **Problem Solving** - Quick answers to operational questions\n\nWhat can I help you with today?" 
+      }],
     }
     setChats([...chats, newChat])
     setActiveChat(newChat.id)
   }
 
-  const sendMessage = () => {
+  // Auto-resize textarea function
+  const autoResizeTextarea = () => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px' // Max height of ~5 lines
+    }
+  }
+
+  // Handle textarea input change
+  const handleTextareaChange = (e) => {
+    setNewMessage(e.target.value)
+    autoResizeTextarea()
+  }
+
+  // Handle key events for textarea
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      if (!isLoading && newMessage.trim()) {
+        sendMessage()
+      }
+    }
+  }
+
+  // Auto-resize on mount and when content changes
+  useEffect(() => {
+    autoResizeTextarea()
+  }, [newMessage])
+
+  const sendMessage = async () => {
     if (!newMessage.trim()) return
 
+    const userMessage = { role: "user", content: newMessage }
+    
     const updatedChats = chats.map((chat) => {
       if (chat.id === activeChat) {
         return {
           ...chat,
-          messages: [...chat.messages, { role: "user", content: newMessage }],
+          messages: [...chat.messages, userMessage],
         }
       }
       return chat
     })
     setChats(updatedChats)
     setNewMessage("")
+    setIsLoading(true)
 
-    // Simulate assistant response
-    setTimeout(() => {
+    try {
+      // Fetch current inventory data for AI context
+      const inventoryResponse = await fetch('/api/inventory')
+      let inventoryData = {
+        totalItems: 0,
+        totalValue: 0,
+        lowStockItems: 0,
+        items: []
+      }
+
+      if (inventoryResponse.ok) {
+        const inventoryResult = await inventoryResponse.json()
+        inventoryData = {
+          totalItems: inventoryResult.totalItems || 0,
+          totalValue: inventoryResult.totalValue || 0,
+          lowStockItems: inventoryResult.items?.filter(item => item.stockQuantity < 5).length || 0,
+          items: inventoryResult.items || []
+        }
+      }
+
+      // Call the AI API with real inventory context
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'business-assistant',
+          prompt: newMessage,
+          data: {
+            context: {
+              totalItems: inventoryData.totalItems,
+              totalValue: inventoryData.totalValue,
+              lowStockItems: inventoryData.lowStockItems
+            },
+            inventoryItems: inventoryData.items
+          }
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get AI response')
+      }
+
+      const aiMessage = { 
+        role: "assistant", 
+        content: data.text || data.response || 'Sorry, I couldn\'t process your request.' 
+      }
+
       const responseChats = updatedChats.map((chat) => {
         if (chat.id === activeChat) {
           return {
             ...chat,
-            messages: [
-              ...chat.messages,
-              { role: "assistant", content: "I understand your question. Let me help you with that." },
-            ],
+            messages: [...chat.messages, aiMessage],
           }
         }
         return chat
       })
       setChats(responseChats)
-    }, 1000)
+
+    } catch (error) {
+      console.error('Error sending message:', error)
+      
+      const errorMessage = { 
+        role: "assistant", 
+        content: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.' 
+      }
+
+      const errorChats = updatedChats.map((chat) => {
+        if (chat.id === activeChat) {
+          return {
+            ...chat,
+            messages: [...chat.messages, errorMessage],
+          }
+        }
+        return chat
+      })
+      setChats(errorChats)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const currentChat = chats.find((chat) => chat.id === activeChat)
@@ -224,18 +420,30 @@ export default function AssistantPage() {
         </div>
 
         {/* Chat Messages */}
-        <div className={cn("flex-1 overflow-y-auto p-4 space-y-4 bg-black", styles.chatContainer)}>
+        <div className={cn(
+          "flex-1 overflow-y-auto p-4 space-y-4 bg-black custom-scrollbar",
+          styles.chatContainer
+        )}>
           {currentChat?.messages.map((message, index) => (
             <div key={index} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start", styles.messageSlideIn)}>
               <div
                 className={cn(
-                  "max-w-xs lg:max-w-md px-4 py-2 rounded-lg",
+                  "px-4 py-3 rounded-lg",
                   message.role === "user" 
-                    ? `text-white ${styles.userMessage}` 
-                    : `text-gray-100 ${styles.assistantMessage}`,
+                    ? `text-white max-w-xs lg:max-w-md ${styles.userMessage}` 
+                    : `text-gray-100 max-w-md lg:max-w-lg ${styles.assistantMessage}`,
                 )}
               >
-                {message.content}
+                {message.role === "assistant" ? (
+                  <div 
+                    className="text-gray-200 leading-relaxed"
+                    dangerouslySetInnerHTML={{ 
+                      __html: formatMessage(message.content) 
+                    }} 
+                  />
+                ) : (
+                  message.content
+                )}
               </div>
             </div>
           ))}
@@ -243,19 +451,34 @@ export default function AssistantPage() {
 
         {/* Chat Input */}
         <div className="p-4 border-t border-gray-700 bg-black">
-          <div className="flex gap-2">
-            <Input
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message..."
-              className={cn("flex-1 bg-gray-800 border-gray-700 text-white placeholder-gray-400 focus:border-blue-500", styles.chatInput)}
-              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-            />
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <textarea
+                ref={textareaRef}
+                value={newMessage}
+                onChange={handleTextareaChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your message..."
+                className={cn(
+                  "w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-400",
+                  "focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500",
+                  "rounded-md px-3 py-2 resize-none min-h-[40px] max-h-[120px]",
+                  "leading-5 text-sm transition-all duration-200 custom-scrollbar",
+                  styles.chatInput
+                )}
+                rows={1}
+              />
+            </div>
             <Button 
               onClick={sendMessage} 
-              className="bg-blue-600 hover:bg-blue-700"
+              disabled={isLoading || !newMessage.trim()}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed h-[40px]"
             >
-              <Send className="h-4 w-4" />
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
