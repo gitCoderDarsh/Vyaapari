@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { Edit, Plus, Send, Loader2 } from "lucide-react"
+import { Edit, Plus, Send, Loader2, MoreVertical, Trash2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import Sidebar from "@/components/dashboard/Sidebar"
@@ -223,6 +223,10 @@ export default function AssistantPage() {
   const [chats, setChats] = useState([])
   const [activeChat, setActiveChat] = useState(null)
   const [newMessage, setNewMessage] = useState("")
+  const [showChatOptions, setShowChatOptions] = useState(null) // Which chat's options are showing
+  const [isRenaming, setIsRenaming] = useState(null) // Which chat is being renamed
+  const [renameValue, setRenameValue] = useState("") // Current rename input value
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null) // Which chat to delete
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -332,6 +336,85 @@ export default function AssistantPage() {
   useEffect(() => {
     autoResizeTextarea()
   }, [newMessage])
+
+  // Close chat options when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if the click is outside the dropdown and not on the trigger button
+      if (showChatOptions && !event.target.closest('.chat-options-container')) {
+        setShowChatOptions(null)
+      }
+    }
+    
+    if (showChatOptions) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showChatOptions])
+
+  // Handle chat rename
+  const handleRenameChat = async (chatId, newName) => {
+    if (!newName.trim()) return
+
+    try {
+      const response = await fetch(`/api/chat/${chatId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim() })
+      })
+
+      if (response.ok) {
+        // Update local state
+        setChats(chats.map(chat => 
+          chat.id === chatId 
+            ? { ...chat, name: newName.trim() }
+            : chat
+        ))
+        setIsRenaming(null)
+        setRenameValue("")
+      }
+    } catch (error) {
+      console.error('Error renaming chat:', error)
+    }
+  }
+
+  // Handle chat deletion
+  const handleDeleteChat = async (chatId) => {
+    try {
+      const response = await fetch(`/api/chat/${chatId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        // Remove from local state
+        const updatedChats = chats.filter(chat => chat.id !== chatId)
+        setChats(updatedChats)
+        
+        // If we deleted the active chat, switch to another one
+        if (activeChat === chatId) {
+          setActiveChat(updatedChats.length > 0 ? updatedChats[0].id : null)
+        }
+        
+        setShowDeleteConfirm(null)
+        setShowChatOptions(null)
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error)
+    }
+  }
+
+  // Start renaming a chat
+  const startRename = (chatId, currentName) => {
+    setIsRenaming(chatId)
+    setRenameValue(currentName)
+    setShowChatOptions(null)
+  }
+
+  // Cancel renaming
+  const cancelRename = () => {
+    setIsRenaming(null)
+    setRenameValue("")
+  }
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !activeChat) return
@@ -495,27 +578,105 @@ export default function AssistantPage() {
         isSidebarCollapsed ? "left-16" : "left-64",
         styles.chatSidebar
       )}>
-        <div className={cn("p-4 border-b border-gray-700", styles.chatHeader)}>
+        <div className="p-4 border-b border-gray-700 bg-gray-800">
           <h2 className="font-bold text-white">Chat Sessions</h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
           <div className="space-y-2">
             {chats.map((chat) => (
               <div key={chat.id} className="group relative">
-                <button
-                  onClick={() => setActiveChat(chat.id)}
-                  className={cn(
-                    "w-full text-left px-3 py-2 rounded-lg",
-                    styles.chatSessionItem,
-                    activeChat === chat.id && styles.active
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="truncate">{chat.name}</span>
-                    <Edit className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                {isRenaming === chat.id ? (
+                  // Rename input
+                  <div className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleRenameChat(chat.id, renameValue)
+                        } else if (e.key === 'Escape') {
+                          cancelRename()
+                        }
+                      }}
+                      onBlur={() => {
+                        if (renameValue.trim()) {
+                          handleRenameChat(chat.id, renameValue)
+                        } else {
+                          cancelRename()
+                        }
+                      }}
+                      className="w-full bg-gray-700 text-white border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
+                      autoFocus
+                    />
                   </div>
-                </button>
+                ) : (
+                  // Regular chat item
+                  <div className="relative chat-options-container">
+                    <div
+                      onClick={() => setActiveChat(chat.id)}
+                      className={cn(
+                        "w-full text-left px-3 py-2 rounded-lg transition-colors cursor-pointer",
+                        activeChat === chat.id 
+                          ? "bg-blue-600 text-white" 
+                          : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="truncate">{chat.name}</span>
+                        <div className="flex items-center gap-1">
+                          {/* Chat options button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setShowChatOptions(showChatOptions === chat.id ? null : chat.id)
+                            }}
+                            className={cn(
+                              "p-1.5 hover:bg-gray-600 rounded transition-all",
+                              "opacity-0 group-hover:opacity-100",
+                              showChatOptions === chat.id && "opacity-100 bg-gray-600"
+                            )}
+                            type="button"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Chat options dropdown */}
+                    {showChatOptions === chat.id && (
+                      <div 
+                        className="absolute right-2 top-8 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50 min-w-[120px] overflow-hidden"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            startRename(chat.id, chat.name)
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 hover:text-white flex items-center gap-2 transition-colors"
+                          type="button"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Rename
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setShowDeleteConfirm(chat.id)
+                            setShowChatOptions(null)
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-red-300 hover:bg-red-700 hover:text-white flex items-center gap-2 transition-colors"
+                          type="button"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -538,8 +699,8 @@ export default function AssistantPage() {
         isSidebarCollapsed ? "ml-80" : "ml-128" // ml-16 + ml-64 = ml-80 (collapsed) OR ml-64 + ml-64 = ml-128 (expanded)
       )}>
         {/* Chat Header */}
-        <div className={cn("p-4 border-b border-gray-700 bg-black", styles.chatHeader)}>
-          <h2 className="text-xl font-semibold text-white">{currentChat?.name}</h2>
+        <div className="p-4 border-b border-gray-700 bg-gray-900">
+          <h2 className="text-l font-semibold text-white">{currentChat?.name}</h2>
         </div>
 
         {/* Chat Messages */}
@@ -573,7 +734,7 @@ export default function AssistantPage() {
         </div>
 
         {/* Chat Input */}
-        <div className="p-4 border-t border-gray-700 bg-black">
+        <div className="p-2 border-t border-gray-700 bg-gray-900">
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <textarea
@@ -606,6 +767,35 @@ export default function AssistantPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Delete Chat</h3>
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to delete "{chats.find(chat => chat.id === showDeleteConfirm)?.name}"? 
+              This action cannot be undone and all messages will be permanently lost.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                onClick={() => setShowDeleteConfirm(null)}
+                variant="outline"
+                className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleDeleteChat(showDeleteConfirm)}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Logout Modal */}
       <LogoutModal
