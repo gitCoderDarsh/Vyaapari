@@ -72,6 +72,7 @@ export default function AssistantPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const textareaRef = useRef(null)
+  const chatContainerRef = useRef(null)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("Assistant")
@@ -236,6 +237,15 @@ export default function AssistantPage() {
     }
   }, [session, status, router])
 
+  // Auto-scroll to bottom when messages change or active chat changes
+  useEffect(() => {
+    const activeCurrentChat = chats.find((chat) => chat.id === activeChat)
+    if (activeCurrentChat?.messages.length > 0) {
+      // Small delay to ensure DOM is updated
+      setTimeout(scrollToBottom, 100)
+    }
+  }, [chats, activeChat])
+
   const navItems = [
     { name: "Inventory", icon: "Package", active: false },
     { name: "Assistant", icon: "Bot", active: true },
@@ -313,6 +323,17 @@ export default function AssistantPage() {
     if (textarea) {
       textarea.style.height = 'auto'
       textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px' // Max height of ~5 lines
+    }
+  }
+
+  // Auto-scroll to bottom of chat container
+  const scrollToBottom = () => {
+    const chatContainer = chatContainerRef.current
+    if (chatContainer) {
+      chatContainer.scrollTo({
+        top: chatContainer.scrollHeight,
+        behavior: 'smooth'
+      })
     }
   }
 
@@ -420,6 +441,7 @@ export default function AssistantPage() {
     if (!newMessage.trim() || !activeChat) return
 
     const userMessage = { role: "user", content: newMessage }
+    const currentActiveChat = chats.find((chat) => chat.id === activeChat)
     
     // Optimistically update UI
     const updatedChats = chats.map((chat) => {
@@ -434,6 +456,9 @@ export default function AssistantPage() {
     setChats(updatedChats)
     setNewMessage("")
     setIsLoading(true)
+
+    // Scroll to show user message immediately
+    setTimeout(scrollToBottom, 50)
 
     try {
       // Save user message to database
@@ -466,7 +491,7 @@ export default function AssistantPage() {
         }
       }
 
-      // Call the AI API with real inventory context
+      // Call the AI API with real inventory context and conversation history
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: {
@@ -475,6 +500,7 @@ export default function AssistantPage() {
         body: JSON.stringify({
           type: 'business-assistant',
           prompt: newMessage,
+          conversationHistory: currentActiveChat?.messages || [], // Include conversation context
           data: {
             context: {
               totalItems: inventoryData.totalItems,
@@ -518,12 +544,33 @@ export default function AssistantPage() {
       })
       setChats(responseChats)
 
+      // Scroll to show AI response
+      setTimeout(scrollToBottom, 100)
+
     } catch (error) {
       console.error('Error sending message:', error)
       
-      const errorMessage = { 
+      let errorMessage = { 
         role: "assistant", 
-        content: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.' 
+        content: ''
+      }
+
+      // Handle different types of errors with specific messages
+      if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
+        errorMessage.content = "🌐 **Connection Lost**\n\nI can't reach the server right now. Please check your internet connection and try again."
+      } else if (error.message?.includes('timeout')) {
+        errorMessage.content = "⏰ **Request Timeout**\n\nThe request is taking too long. Please try again - this usually resolves quickly."
+      } else if (error.message?.includes('rate limit') || error.status === 429) {
+        errorMessage.content = "⏱️ **Slow Down**\n\nYou're sending messages too quickly. Please wait a moment and try again."
+      } else if (error.status === 401) {
+        errorMessage.content = "🔒 **Authentication Issue**\n\nYour session may have expired. Please refresh the page and log in again."
+      } else if (error.status === 403) {
+        errorMessage.content = "🚫 **Access Denied**\n\nYou don't have permission to use the AI service. Please contact your administrator."
+      } else if (error.status >= 500) {
+        errorMessage.content = "🔧 **Server Problem**\n\nOur servers are having issues. Please try again in a few minutes."
+      } else {
+        // Generic fallback with helpful suggestions
+        errorMessage.content = "⚠️ **Something Went Wrong**\n\nI'm having trouble processing your request right now.\n\n💡 **You can try:**\n• Refreshing the page\n• Checking your internet connection\n• Trying again in a moment\n• Using the inventory section directly for basic operations"
       }
 
       const errorChats = updatedChats.map((chat) => {
@@ -536,6 +583,9 @@ export default function AssistantPage() {
         return chat
       })
       setChats(errorChats)
+
+      // Scroll to show error message
+      setTimeout(scrollToBottom, 100)
     } finally {
       setIsLoading(false)
     }
@@ -704,10 +754,13 @@ export default function AssistantPage() {
         </div>
 
         {/* Chat Messages */}
-        <div className={cn(
-          "flex-1 overflow-y-auto p-4 space-y-4 bg-black custom-scrollbar",
-          styles.chatContainer
-        )}>
+        <div 
+          ref={chatContainerRef}
+          className={cn(
+            "flex-1 overflow-y-auto p-4 space-y-4 bg-black custom-scrollbar",
+            styles.chatContainer
+          )}
+        >
           {currentChat?.messages.map((message, index) => (
             <div key={index} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start", styles.messageSlideIn)}>
               <div
@@ -735,7 +788,7 @@ export default function AssistantPage() {
 
         {/* Chat Input */}
         <div className="p-2 border-t border-gray-700 bg-gray-900">
-          <div className="flex gap-2 items-end">
+          <div className="flex gap-2 items-start">
             <div className="flex-1">
               <textarea
                 ref={textareaRef}
@@ -756,7 +809,7 @@ export default function AssistantPage() {
             <Button 
               onClick={sendMessage} 
               disabled={isLoading || !newMessage.trim()}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed h-[40px]"
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] h-[40px] flex-shrink-0 mt-0"
             >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

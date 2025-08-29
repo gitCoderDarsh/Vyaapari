@@ -97,47 +97,57 @@ class GeminiService {
         errorCode: error?.code || 'No error code',
         errorStatus: error?.status || 'No error status',
         errorName: error?.name || 'No error name',
-        errorStack: error?.stack || 'No stack trace',
-        stringifiedError: JSON.stringify(error, null, 2),
         timestamp: new Date().toISOString()
       })
 
-      // Check if the error is related to an invalid model
-      if (error.message && error.message.includes('models/gemini-2.5-flash is not found')) {
+      // Detailed error handling with user-friendly messages
+      let fallbackText = ''
+      let isTemporary = true
+
+      if (error.message?.includes('API_KEY') || error.message?.includes('Invalid API key')) {
+        fallbackText = "🔑 **API Configuration Issue**\n\nThe AI service isn't properly configured. Please check with your administrator about the API key setup."
+        isTemporary = false
+      } else if (error.message?.includes('QUOTA') || error.message?.includes('quota exceeded')) {
+        fallbackText = "📊 **Usage Limit Reached**\n\nWe've hit our daily AI usage limit. The service will reset tomorrow, or you can try basic inventory operations in the meantime."
+        isTemporary = true
+      } else if (error.message?.includes('models/') && error.message?.includes('not found')) {
         console.warn('⚠️ [VS CODE] The specified model is not available. Fetching available models...')
-        
-        // Fetch the list of available models
         const availableModels = await this.listAvailableModels()
         console.log('📋 [VS CODE] Available Models:', availableModels)
         
-        return {
-          text: 'The requested model (gemini-2.5-flash) is not available. Check console for available models.',
-          success: false
-        }
+        fallbackText = "🤖 **AI Model Unavailable**\n\nThe AI model is temporarily unavailable. Our team has been notified and will update the service soon."
+        isTemporary = true
+      } else if (error.message?.includes('SAFETY') || error.message?.includes('blocked')) {
+        fallbackText = "🛡️ **Safety Filter Activated**\n\nYour message was flagged by our safety systems. Please try rephrasing your question about inventory or business operations."
+        isTemporary = false
+      } else if (error.message?.includes('RATE_LIMIT') || error.message?.includes('rate limit')) {
+        fallbackText = "⏱️ **Too Many Requests**\n\nYou're sending messages too quickly. Please wait a moment and try again."
+        isTemporary = true
+      } else if (error.message?.includes('NETWORK') || error.message?.includes('network') || error.code === 'ENOTFOUND') {
+        fallbackText = "🌐 **Connection Issue**\n\nI'm having trouble connecting to the AI service. Please check your internet connection and try again."
+        isTemporary = true
+      } else if (error.message?.includes('timeout') || error.code === 'TIMEOUT') {
+        fallbackText = "⏰ **Request Timeout**\n\nThe AI service is taking too long to respond. This usually resolves quickly - please try again."
+        isTemporary = true
+      } else if (error.message?.includes('500') || error.message?.includes('Internal Server Error')) {
+        fallbackText = "🔧 **Service Temporarily Down**\n\nThe AI service is experiencing technical difficulties. Please try again in a few minutes."
+        isTemporary = true
+      } else {
+        // Generic network/unknown error
+        fallbackText = "⚠️ **Service Unavailable**\n\nI'm temporarily unable to process your request. This is usually a brief issue - please try again in a moment."
+        isTemporary = true
       }
-      
-      // Provide helpful fallback messages based on error type
-      let fallbackText = 'AI service temporarily unavailable'
-      if (error.message?.includes('API_KEY')) {
-        fallbackText = 'Invalid API key. Please check your Gemini API configuration.'
-      } else if (error.message?.includes('QUOTA')) {
-        fallbackText = 'API quota exceeded. Please try again later.'
-      }
-      if (error.message.includes('models/gemini-pro is not found')) {
-        console.warn('⚠️ The specified model is not available. Fetching available models...')
 
-        // Fetch the list of available models
-        const availableModels = await this.listAvailableModels()
-        console.log('Available Models:', availableModels)
-
-        // Return a fallback response or rethrow the error
-        fallbackText = 'The requested model is not available. Please try again later.'
+      // Add helpful suggestions for temporary issues
+      if (isTemporary) {
+        fallbackText += "\n\n💡 **In the meantime, you can:**\n• Check your inventory levels manually\n• Review your stock reports\n• Add or edit items in your inventory\n• Come back and ask me again in a few minutes"
       }
       
       return {
         text: fallbackText,
         success: false,
-        error: error.message
+        error: error.message,
+        isTemporary
       }
     }
   }
@@ -191,31 +201,13 @@ class GeminiService {
     result = result.replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
     result = result.replace(/•\s*•/g, '•') // Remove duplicate bullets
     result = result.trim()
-    
-    // Ensure maximum length (truncate if too long)
-    if (result.length > 800) {
-      const lines = result.split('\n')
-      let truncated = ''
-      let currentLength = 0
-      
-      for (const line of lines) {
-        if (currentLength + line.length > 800) break
-        truncated += line + '\n'
-        currentLength += line.length + 1
-      }
-      
-      result = truncated.trim()
-      if (!result.endsWith('.')) {
-        result += '...'
-      }
-    }
-    
+
     console.log('🎨 [VS CODE] Response formatted:', {
       originalLength: rawResponse.length,
       formattedLength: result.length,
       bulletPoints: (result.match(/•/g) || []).length
     })
-    
+
     return result
   }
 
@@ -443,7 +435,7 @@ Keep response brief, helpful, and focused on improving their search experience.`
   async businessAssistant(question, inventoryContext = {}) {
     if (!this.isEnabled) {
       return {
-        text: `AI assistant is not configured. For inventory help, try checking your stock levels, reviewing low-stock items, or analyzing your sales patterns.`,
+        text: `🤖 **AI Assistant Not Available**\n\nThe AI service isn't configured right now, but I can still help!\n\n💡 **Here are some things you can do:**\n\n• **Check Stock Levels** - Review items running low\n• **Add New Items** - Use the "Add Item" button\n• **View Reports** - Check your inventory analytics\n• **Search Products** - Use the search bar to find items\n• **Update Quantities** - Edit existing items\n\n📊 **Quick Inventory Tips:**\n• Items with less than 5 units are considered low stock\n• Regular audits help maintain accuracy\n• Set reorder points for popular items\n\nTry asking me again later when the AI service is restored!`,
         success: false
       }
     }
@@ -458,6 +450,7 @@ Keep response brief, helpful, and focused on improving their search experience.`
 
     // Prepare inventory items for analysis (sanitized for privacy)
     const inventoryItems = inventoryContext.inventoryItems || []
+    const conversationHistory = inventoryContext.conversationHistory || []
     const itemsList = inventoryItems.length > 0 
       ? inventoryItems.map(item => {
           // Sanitize sensitive data - only send essential info for analysis
@@ -469,11 +462,12 @@ Keep response brief, helpful, and focused on improving their search experience.`
     const isStrategicQuestion = this.isStrategicBusinessQuestion(question)
     
     const prompt = isStrategicQuestion 
-      ? this.buildStrategicPrompt(question, inventoryContext, itemsList)
-      : this.buildGeneralPrompt(question, inventoryContext, itemsList)
+      ? this.buildStrategicPrompt(question, inventoryContext, itemsList, conversationHistory)
+      : this.buildGeneralPrompt(question, inventoryContext, itemsList, conversationHistory)
 
     console.log('💬 Business assistant query type:', isStrategicQuestion ? 'Strategic Business' : 'General Analysis')
     console.log('💬 Business assistant query:', question)
+    console.log('💬 Conversation context:', conversationHistory.length > 0 ? `${conversationHistory.length} previous messages` : 'No previous context')
     
     const result = await this.generateContent(prompt)
     
@@ -536,10 +530,22 @@ Keep response brief, helpful, and focused on improving their search experience.`
   }
 
   // Build prompt for strategic business questions
-  buildStrategicPrompt(question, inventoryContext, itemsList) {
-    return `You are an experienced Inventory Manager Assistant helping a distributor/retailer manage their business. 
+  buildStrategicPrompt(question, inventoryContext, itemsList, conversationHistory = []) {
+    // Build conversation context if available
+    let conversationContext = ''
+    if (conversationHistory.length > 0) {
+      const recentMessages = conversationHistory.slice(-8) // Last 8 messages for context
+      conversationContext = '\nPREVIOUS CONVERSATION CONTEXT:\n'
+      recentMessages.forEach((msg, index) => {
+        const role = msg.role === 'user' ? 'Business Owner' : 'Assistant'
+        conversationContext += `${role}: ${msg.content}\n`
+      })
+      conversationContext += '\nCURRENT QUESTION (continue the conversation naturally):\n'
+    }
 
-BUSINESS OWNER'S QUESTION: "${question}"
+    return `You are an experienced Inventory Manager Assistant helping a distributor/retailer manage their business. 
+${conversationContext}
+BUSINESS OWNER'S ${conversationHistory.length > 0 ? 'FOLLOW-UP ' : ''}QUESTION: "${question}"
 
 THEIR CURRENT SITUATION:
 - Managing ${inventoryContext.totalItems || 'multiple'} different products
@@ -550,7 +556,7 @@ CURRENT PRODUCT PORTFOLIO:
 ${itemsList}
 
 RESPONSE REQUIREMENTS:
-- Act as a helpful assistant, NOT a consultant writing reports
+- ${conversationHistory.length > 0 ? 'CONTINUE the previous conversation naturally - reference what was discussed before' : 'Act as a helpful assistant, NOT a consultant writing reports'}
 - Structure your response with clear sections and formatting
 - Use **bold text** for key points and action items
 - Use bullet points (•) for lists and sub-points
@@ -559,6 +565,7 @@ RESPONSE REQUIREMENTS:
 - Use simple headings like "Key Insights:" or "Action Items:"
 - Focus on their exact question/strategy
 - Give concrete next steps they can take today
+${conversationHistory.length > 0 ? '- Address their specific follow-up question based on the conversation context' : ''}
 
 EXAMPLE FORMAT:
 **Current Situation:**
@@ -577,9 +584,21 @@ Format your response for easy scanning with clear structure and emphasis on acti
   }
 
   // Build prompt for general inventory questions
-  buildGeneralPrompt(question, inventoryContext, itemsList) {
-    return `You are an Inventory Manager Assistant helping with day-to-day business operations.
+  buildGeneralPrompt(question, inventoryContext, itemsList, conversationHistory = []) {
+    // Build conversation context if available
+    let conversationContext = ''
+    if (conversationHistory.length > 0) {
+      const recentMessages = conversationHistory.slice(-6) // Last 6 messages for context
+      conversationContext = '\nPREVIOUS CONVERSATION:\n'
+      recentMessages.forEach((msg, index) => {
+        const role = msg.role === 'user' ? 'Business Owner' : 'Assistant'
+        conversationContext += `${role}: ${msg.content}\n`
+      })
+      conversationContext += '\nCURRENT FOLLOW-UP QUESTION:\n'
+    }
 
+    return `You are an Inventory Manager Assistant helping with day-to-day business operations.
+${conversationContext}
 Question: "${question}"
 
 Current Inventory:
@@ -591,7 +610,7 @@ Product List:
 ${itemsList}
 
 RESPONSE STYLE:
-- Structure responses with clear sections for easy scanning
+- ${conversationHistory.length > 0 ? 'CONTINUE the conversation naturally - reference previous discussion where relevant' : 'Structure responses with clear sections for easy scanning'}
 - Use **bold text** for important points and numbers
 - Use bullet points (•) for lists and recommendations
 - Use numbered steps (1., 2., 3.) for action sequences
@@ -599,6 +618,7 @@ RESPONSE STYLE:
 - Keep answers practical and actionable
 - Give specific actions, not general advice
 - Talk like a helpful assistant, not a consultant
+${conversationHistory.length > 0 ? '- Address their follow-up question based on the conversation context' : ''}
 
 Provide well-formatted, scannable advice based on their current inventory.`
   }
