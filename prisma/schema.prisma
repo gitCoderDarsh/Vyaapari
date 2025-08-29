@@ -50,6 +50,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   inventory     Inventory[] // Relation to inventory items
+  chatSessions  ChatSession[] // Relation to AI chat sessions
 }
 
 model Inventory {
@@ -67,6 +68,39 @@ model Inventory {
   
   // Index for fast user-based queries
   @@index([userId])
+}
+
+model ChatSession {
+  id           String        @id @default(cuid())
+  userId       String        // Foreign key to User
+  name         String        // Chat session name (e.g., "Inventory Help", "Chat 1")
+  isActive     Boolean       @default(true) // Whether this chat is currently active
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[] // One-to-many relation with messages
+  
+  // Index for fast user-based queries
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model ChatMessage {
+  id           String      @id @default(cuid())
+  chatSessionId String     // Foreign key to ChatSession
+  role         String      // "user" or "assistant"
+  content      String      @db.Text // Message content (can be long)
+  metadata     Json?       // Additional metadata (tokens used, model, etc.)
+  createdAt    DateTime    @default(now())
+  
+  // Relations
+  chatSession  ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  
+  // Index for fast chat-based queries
+  @@index([chatSessionId])
+  @@index([chatSessionId, createdAt])
 }
 
 model VerificationToken {

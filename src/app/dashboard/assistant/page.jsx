@@ -126,26 +126,102 @@ export default function AssistantPage() {
       setIsSidebarCollapsed(true)
     }
   }, [])
+
+  // Load chat sessions from database
+  useEffect(() => {
+    const loadChatSessions = async () => {
+      if (!session?.user) return
+
+      try {
+        const response = await fetch('/api/chat')
+        if (response.ok) {
+          const data = await response.json()
+          const dbChats = data.chatSessions || []
+          
+          if (dbChats.length > 0) {
+            // Convert DB format to component format
+            const formattedChats = dbChats.map(chat => ({
+              id: chat.id,
+              name: chat.name,
+              messages: chat.messages.map(msg => ({
+                role: msg.role,
+                content: msg.content
+              }))
+            }))
+            setChats(formattedChats)
+            setActiveChat(dbChats[0].id)
+          } else {
+            // Create default chat sessions if none exist
+            await createDefaultChats()
+          }
+        }
+      } catch (error) {
+        console.error('Error loading chat sessions:', error)
+        // Fall back to default chats
+        await createDefaultChats()
+      }
+    }
+
+    loadChatSessions()
+  }, [session])
+
+  // Create default chat sessions
+  const createDefaultChats = async () => {
+    try {
+      // Create "Inventory Help" chat
+      const inventoryResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Inventory Help' })
+      })
+
+      // Create "Product Questions" chat  
+      const productResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Product Questions' })
+      })
+
+      if (inventoryResponse.ok && productResponse.ok) {
+        const inventoryChat = await inventoryResponse.json()
+        const productChat = await productResponse.json()
+
+        // Add welcome messages
+        await addWelcomeMessage(inventoryChat.chatSession.id, "**Welcome to your AI Business Assistant!** 🤖\n\nI'm powered by Google Gemini and can help you with:\n\n• **Inventory Analysis** - Get insights on stock levels and trends\n• **Business Strategy** - Pricing recommendations and growth advice\n• **Product Questions** - Detailed analysis of your product portfolio\n• **Action Items** - Concrete steps to improve your business\n\nI have access to your current inventory data to provide **personalized recommendations**. What would you like to explore today?")
+        
+        await addWelcomeMessage(productChat.chatSession.id, "**Product Analysis & Strategy** 📊\n\nI can help you with:\n\n1. **Pricing Analysis** - Optimize your product prices\n2. **Inventory Trends** - Identify fast-moving vs slow-moving items\n3. **Stock Management** - Get alerts for low stock items\n4. **Market Positioning** - Strategic advice for your products\n\nAsk me anything about your business or specific products!")
+
+        // Set the formatted chats
+        setChats([
+          { id: inventoryChat.chatSession.id, name: 'Inventory Help', messages: [{ role: 'assistant', content: "**Welcome to your AI Business Assistant!** 🤖\n\nI'm powered by Google Gemini and can help you with:\n\n• **Inventory Analysis** - Get insights on stock levels and trends\n• **Business Strategy** - Pricing recommendations and growth advice\n• **Product Questions** - Detailed analysis of your product portfolio\n• **Action Items** - Concrete steps to improve your business\n\nI have access to your current inventory data to provide **personalized recommendations**. What would you like to explore today?" }] },
+          { id: productChat.chatSession.id, name: 'Product Questions', messages: [{ role: 'assistant', content: "**Product Analysis & Strategy** 📊\n\nI can help you with:\n\n1. **Pricing Analysis** - Optimize your product prices\n2. **Inventory Trends** - Identify fast-moving vs slow-moving items\n3. **Stock Management** - Get alerts for low stock items\n4. **Market Positioning** - Strategic advice for your products\n\nAsk me anything about your business or specific products!" }] }
+        ])
+        setActiveChat(inventoryChat.chatSession.id)
+      }
+    } catch (error) {
+      console.error('Error creating default chats:', error)
+    }
+  }
+
+  // Helper to add welcome message to chat
+  const addWelcomeMessage = async (chatSessionId, content) => {
+    try {
+      await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatSessionId,
+          role: 'assistant',
+          content
+        })
+      })
+    } catch (error) {
+      console.error('Error adding welcome message:', error)
+    }
+  }
   
-  const [chats, setChats] = useState([
-    {
-      id: "1",
-      name: "Inventory Help",
-      messages: [{ 
-        role: "assistant", 
-        content: "**Welcome to your AI Business Assistant!** 🤖\n\nI'm powered by Google Gemini and can help you with:\n\n• **Inventory Analysis** - Get insights on stock levels and trends\n• **Business Strategy** - Pricing recommendations and growth advice\n• **Product Questions** - Detailed analysis of your product portfolio\n• **Action Items** - Concrete steps to improve your business\n\nI have access to your current inventory data to provide **personalized recommendations**. What would you like to explore today?" 
-      }],
-    },
-    {
-      id: "2",
-      name: "Product Questions",
-      messages: [{ 
-        role: "assistant", 
-        content: "**Product Analysis & Strategy** 📊\n\nI can help you with:\n\n1. **Pricing Analysis** - Optimize your product prices\n2. **Inventory Trends** - Identify fast-moving vs slow-moving items\n3. **Stock Management** - Get alerts for low stock items\n4. **Market Positioning** - Strategic advice for your products\n\nAsk me anything about your business or specific products!" 
-      }],
-    },
-  ])
-  const [activeChat, setActiveChat] = useState("1")
+  const [chats, setChats] = useState([])
+  const [activeChat, setActiveChat] = useState(null)
   const [newMessage, setNewMessage] = useState("")
 
   // Redirect if not authenticated
@@ -189,17 +265,42 @@ export default function AssistantPage() {
     router.push("/auth")
   }
 
-  const createNewChat = () => {
-    const newChat = {
-      id: Date.now().toString(),
-      name: `Chat ${chats.length + 1}`,
-      messages: [{ 
-        role: "assistant", 
-        content: "**Hello! I'm your AI Business Assistant** 🚀\n\nKey Capabilities:\n\n• **Inventory Analysis** - Real-time insights from your data\n• **Strategic Advice** - Business growth recommendations\n• **Problem Solving** - Quick answers to operational questions\n\nWhat can I help you with today?" 
-      }],
+  const createNewChat = async () => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: `Chat ${chats.length + 1}` })
+      })
+
+      if (response.ok) {
+        const { chatSession } = await response.json()
+        
+        // Add welcome message
+        const welcomeContent = "**Hello! I'm your AI Business Assistant** 🚀\n\nKey Capabilities:\n\n• **Inventory Analysis** - Real-time insights from your data\n• **Strategic Advice** - Business growth recommendations\n• **Problem Solving** - Quick answers to operational questions\n\nWhat can I help you with today?"
+        
+        await fetch('/api/chat/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chatSessionId: chatSession.id,
+            role: 'assistant',
+            content: welcomeContent
+          })
+        })
+
+        const newChat = {
+          id: chatSession.id,
+          name: chatSession.name,
+          messages: [{ role: "assistant", content: welcomeContent }]
+        }
+        
+        setChats([...chats, newChat])
+        setActiveChat(chatSession.id)
+      }
+    } catch (error) {
+      console.error('Error creating new chat:', error)
     }
-    setChats([...chats, newChat])
-    setActiveChat(newChat.id)
   }
 
   // Auto-resize textarea function
@@ -233,10 +334,11 @@ export default function AssistantPage() {
   }, [newMessage])
 
   const sendMessage = async () => {
-    if (!newMessage.trim()) return
+    if (!newMessage.trim() || !activeChat) return
 
     const userMessage = { role: "user", content: newMessage }
     
+    // Optimistically update UI
     const updatedChats = chats.map((chat) => {
       if (chat.id === activeChat) {
         return {
@@ -251,6 +353,17 @@ export default function AssistantPage() {
     setIsLoading(true)
 
     try {
+      // Save user message to database
+      await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatSessionId: activeChat,
+          role: 'user',
+          content: newMessage
+        })
+      })
+
       // Fetch current inventory data for AI context
       const inventoryResponse = await fetch('/api/inventory')
       let inventoryData = {
@@ -296,11 +409,21 @@ export default function AssistantPage() {
         throw new Error(data.error || 'Failed to get AI response')
       }
 
-      const aiMessage = { 
-        role: "assistant", 
-        content: data.text || data.response || 'Sorry, I couldn\'t process your request.' 
-      }
+      const aiResponse = data.text || data.response || 'Sorry, I couldn\'t process your request.'
+      const aiMessage = { role: "assistant", content: aiResponse }
 
+      // Save AI message to database
+      await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatSessionId: activeChat,
+          role: 'assistant',
+          content: aiResponse
+        })
+      })
+
+      // Update UI with AI response
       const responseChats = updatedChats.map((chat) => {
         if (chat.id === activeChat) {
           return {
