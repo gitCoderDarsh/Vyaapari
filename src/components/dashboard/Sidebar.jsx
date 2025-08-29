@@ -12,11 +12,11 @@ const iconMap = {
 export default function Sidebar({ navItems, activeTab, handleNavClick, setShowLogoutModal, isCollapsed = false }) {
   return (
     <div className={`hidden md:block ${isCollapsed ? 'w-16' : 'w-64'} bg-gray-900 h-screen fixed left-0 top-0 border-r border-gray-800 transition-all duration-300`}>
-      <div className={`${isCollapsed ? 'p-2' : 'p-6'} flex flex-col h-full transition-all duration-300`}>
+      <div className={`${isCollapsed ? 'px-2 py-6' : 'p-6'} flex flex-col h-full transition-all duration-300`}>
         <div>
-          <h1 className={`font-bold text-white mb-8 transition-all duration-300 ${isCollapsed ? 'text-xs opacity-0 h-0 mb-4' : 'text-xl opacity-100'}`}>
-            {!isCollapsed && "Dashboard"}
-          </h1>
+          <div className="h-8 mb-8">
+            {/* Fixed spacing container - no text, consistent height */}
+          </div>
           <nav className="space-y-2">
             {navItems.map((item) => {
               const IconComponent = iconMap[item.icon]

@@ -18,6 +18,27 @@ export default function AssistantPage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("Assistant")
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  
+  // Handle sidebar collapse animation when entering Assistant page
+  useEffect(() => {
+    // Check if we're navigating from another page
+    const isNavigatingToAssistant = sessionStorage.getItem('navigatingToAssistant')
+    
+    if (isNavigatingToAssistant) {
+      // Coming from another page - show transition
+      sessionStorage.removeItem('navigatingToAssistant')
+      // Start expanded and then collapse to show the transition
+      setIsSidebarCollapsed(false)
+      const timer = setTimeout(() => {
+        setIsSidebarCollapsed(true)
+      }, 100)
+      return () => clearTimeout(timer)
+    } else {
+      // Direct load or refresh - start collapsed
+      setIsSidebarCollapsed(true)
+    }
+  }, [])
   
   const [chats, setChats] = useState([
     {
@@ -52,11 +73,20 @@ export default function AssistantPage() {
     if (itemName === "Logout") {
       setShowLogoutModal(true)
     } else if (itemName === "Inventory") {
-      router.push("/dashboard/inventory")
+      // Expand sidebar with animation before navigating
+      setIsSidebarCollapsed(false)
+      setTimeout(() => {
+        router.push("/dashboard/inventory")
+      }, 320) // Wait for animation to complete
     } else if (itemName === "Assistant") {
-      router.push("/dashboard/assistant")
+      // Already on Assistant page
+      setIsSidebarCollapsed(true)
     } else if (itemName === "Profile") {
-      router.push("/dashboard/profile")
+      // Expand sidebar with animation before navigating
+      setIsSidebarCollapsed(false)
+      setTimeout(() => {
+        router.push("/dashboard/profile")
+      }, 320) // Wait for animation to complete
     }
   }
 
@@ -121,13 +151,13 @@ export default function AssistantPage() {
 
   return (
     <div className="flex h-screen bg-black text-white">
-      {/* Desktop Sidebar - Collapsed when Assistant is active */}
+      {/* Desktop Sidebar - Dynamic collapse based on state */}
       <Sidebar
         navItems={navItems}
         activeTab={activeTab}
         handleNavClick={handleNavClick}
         setShowLogoutModal={setShowLogoutModal}
-        isCollapsed={true}
+        isCollapsed={isSidebarCollapsed}
       />
 
       {/* Mobile Header */}
@@ -140,8 +170,12 @@ export default function AssistantPage() {
         setShowLogoutModal={setShowLogoutModal}
       />
 
-      {/* Chat Sessions Sidebar - Positioned next to collapsed main sidebar */}
-      <div className={cn("hidden md:block ml-16 w-64 bg-gray-800 border-r border-gray-700 flex flex-col", styles.chatSidebar)}>
+      {/* Chat Sessions Sidebar - Positioned dynamically based on main sidebar state */}
+      <div className={cn(
+        "hidden md:block fixed top-0 h-screen w-64 bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-300",
+        isSidebarCollapsed ? "left-16" : "left-64",
+        styles.chatSidebar
+      )}>
         <div className={cn("p-4 border-b border-gray-700", styles.chatHeader)}>
           <h2 className="font-bold text-white">Chat Sessions</h2>
         </div>
@@ -179,8 +213,11 @@ export default function AssistantPage() {
         </div>
       </div>
 
-      {/* Main Content Area - Adjusted margin for collapsed sidebar + chat sidebar */}
-      <div className="flex-1 flex flex-col ml-80"> {/* ml-16 (collapsed sidebar) + ml-64 (chat sidebar) = ml-80 */}
+      {/* Main Content Area - Dynamically adjusted margin */}
+      <div className={cn(
+        "flex-1 flex flex-col transition-all duration-300",
+        isSidebarCollapsed ? "ml-80" : "ml-128" // ml-16 + ml-64 = ml-80 (collapsed) OR ml-64 + ml-64 = ml-128 (expanded)
+      )}>
         {/* Chat Header */}
         <div className={cn("p-4 border-b border-gray-700 bg-black", styles.chatHeader)}>
           <h2 className="text-xl font-semibold text-white">{currentChat?.name}</h2>

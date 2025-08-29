@@ -175,6 +175,8 @@ export default function InventoryPage() {
     } else if (itemName === "Inventory") {
       router.push("/dashboard/inventory")
     } else if (itemName === "Assistant") {
+      // Set a flag so Assistant page knows to start with transition
+      sessionStorage.setItem('navigatingToAssistant', 'true')
       router.push("/dashboard/assistant")
     } else if (itemName === "Profile") {
       router.push("/dashboard/profile")
