@@ -1,3 +1,7 @@
+// Prisma Schema for Vyaapari - AI Inventory Management System
+// This schema defines the complete database structure for user management,
+// inventory tracking, AI chat functionality, customer management, and sales operations
+
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -8,6 +12,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// NextAuth.js required models for Google OAuth and session management
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -26,6 +31,7 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
+// Session management for NextAuth.js
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -34,79 +40,194 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Core user model - represents business owners using Vyaapari
+// Supports both Google OAuth and manual signup with email/password
 model User {
   id            String      @id @default(cuid())
-  name          String?     // For Google OAuth users
+  name          String?     // For Google OAuth users (full name)
   firstName     String?     // For manual signup users
   lastName      String?     // For manual signup users
-  businessName  String?
-  email         String      @unique
-  phone         String?
-  password      String?
-  emailVerified DateTime?
-  image         String?
+  businessName  String?     // Business/company name
+  email         String      @unique // Primary identifier
+  phone         String?     // Contact number
+  password      String?     // Hashed password for manual signup
+  emailVerified DateTime?   // Email verification status
+  image         String?     // Profile image URL (from Google)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @default(now())
-  accounts      Account[]
-  sessions      Session[]
-  inventory     Inventory[] // Relation to inventory items
-  chatSessions  ChatSession[] // Relation to AI chat sessions
+  
+  // Relations - all user data is scoped to prevent cross-user access
+  accounts      Account[]      // OAuth accounts
+  sessions      Session[]      // Login sessions
+  inventory     Inventory[]    // User's inventory items
+  chatSessions  ChatSession[]  // AI chat sessions
+  customers     Customer[]     // Customer database
+  sales         Sale[]         // Sales records
 }
 
+// Inventory management - core feature of Vyaapari
+// Each item belongs to a specific user for multi-tenant isolation
 model Inventory {
   id             String   @id @default(cuid())
-  userId         String   // Foreign key to User
+  userId         String   // Foreign key to User (business owner)
   itemName       String   // Product/item name
   stockQuantity  Int      @default(0) // Current stock count
-  itemPrice      Decimal  @db.Decimal(10, 2) // Price per unit (required for inventory value)
-  customFields   Json?    // User-defined fields as JSON
+  itemPrice      Decimal  @db.Decimal(10, 2) // Selling price per unit (INR format)
+  customFields   Json?    // User-defined fields stored as JSON for flexibility
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   
-  // Relation to user
+  // Relations
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  saleItems      SaleItem[] // Track when this inventory item is sold
   
-  // Index for fast user-based queries
-  @@index([userId])
+  // Indexes for performance optimization
+  @@index([userId]) // Fast user-based queries
 }
 
+// AI Chat system for business intelligence and natural language queries
+// Supports multiple chat sessions per user for organized conversations
 model ChatSession {
   id           String        @id @default(cuid())
-  userId       String        // Foreign key to User
-  name         String        // Chat session name (e.g., "Inventory Help", "Chat 1")
+  userId       String        // Foreign key to User (business owner)
+  name         String        // Chat session name (e.g., "Inventory Help", "Sales Analysis")
   isActive     Boolean       @default(true) // Whether this chat is currently active
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   
   // Relations
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages     ChatMessage[] // One-to-many relation with messages
+  messages     ChatMessage[] // One-to-many relation with chat messages
   
-  // Index for fast user-based queries
-  @@index([userId])
-  @@index([userId, createdAt])
+  // Indexes for performance
+  @@index([userId]) // Fast user-based queries
+  @@index([userId, createdAt]) // Chronological ordering
 }
 
+// Individual messages within AI chat sessions
+// Stores both user queries and AI responses with metadata
 model ChatMessage {
   id           String      @id @default(cuid())
   chatSessionId String     // Foreign key to ChatSession
-  role         String      // "user" or "assistant"
-  content      String      @db.Text // Message content (can be long)
-  metadata     Json?       // Additional metadata (tokens used, model, etc.)
+  role         String      // "user" or "assistant" (OpenAI format)
+  content      String      @db.Text // Message content (can be very long for AI responses)
+  metadata     Json?       // Additional data (tokens used, model version, processing time)
   createdAt    DateTime    @default(now())
   
   // Relations
   chatSession  ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
   
-  // Index for fast chat-based queries
-  @@index([chatSessionId])
-  @@index([chatSessionId, createdAt])
+  // Indexes for performance
+  @@index([chatSessionId]) // Fast chat-based queries
+  @@index([chatSessionId, createdAt]) // Chronological message ordering
 }
 
+// Customer management system for building client database
+// Supports both quick sales (no customer record) and full customer management
+model Customer {
+  id            String   @id @default(cuid())
+  userId        String   // Foreign key to User (business owner)
+  name          String   // Customer full name
+  phone         String?  // Contact number (Indian format)
+  email         String?  // Email address
+  address       String?  // Physical address
+  gstNumber     String?  // GST registration number for business customers
+  notes         String?  // Additional notes about customer preferences/history
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sales         Sale[]   // Customer purchase history
+  
+  // Indexes for fast searches and queries
+  @@index([userId]) // User-scoped queries
+  @@index([userId, name]) // Customer name searches
+  @@index([phone]) // Phone number lookup
+  @@index([email]) // Email lookup
+}
+
+// Core sales/billing system with comprehensive financial tracking
+// Supports both quick sales and full customer relationship management
+model Sale {
+  id               String      @id @default(cuid())
+  userId           String      // Foreign key to User (business owner)
+  
+  // Customer information (dual storage for flexibility)
+  customerId       String?     // Optional link to Customer record
+  customerName     String      // Customer name (always stored for quick sales)
+  customerPhone    String?     // Customer phone (stored directly)
+  customerEmail    String?     // Customer email (stored directly)
+  customerAddress  String?     // Customer address (stored directly)
+  
+  // Sale identification and timing
+  billNumber       String      // Invoice/bill number (auto-generated, unique per user)
+  saleDate         DateTime    @default(now()) // Date and time of sale
+  
+  // Financial calculations (all in INR, 2 decimal precision)
+  subtotal         Decimal     @db.Decimal(10, 2) // Total before tax and discount
+  taxRate          Decimal?    @db.Decimal(5, 2)  // Tax percentage (GST rate)
+  taxAmount        Decimal?    @db.Decimal(10, 2) // Calculated tax amount
+  discountAmount   Decimal?    @db.Decimal(10, 2) // Discount given to customer
+  totalAmount      Decimal     @db.Decimal(10, 2) // Final amount to be paid
+  profitAmount     Decimal?    @db.Decimal(10, 2) // Calculated profit (selling - cost)
+  
+  // Payment tracking and status
+  paymentStatus    String      @default("Pending") // Paid, Pending, Partial, Refunded
+  paymentMethod    String?     // Cash, UPI, Card, Bank Transfer, Cheque, etc.
+  paidAmount       Decimal?    @db.Decimal(10, 2) // Amount actually received
+  
+  // Business operations
+  notes            String?     // Additional notes about the sale
+  salesPerson      String?     // Staff member who made the sale
+  
+  // System timestamps
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  
+  // Relations
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer         Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  saleItems        SaleItem[]  // Individual products/services sold
+  
+  // Indexes for performance and business queries
+  @@index([userId]) // User-scoped queries
+  @@index([userId, saleDate]) // Date-based reports and analytics
+  @@index([billNumber]) // Quick bill lookup
+  @@index([customerId]) // Customer purchase history
+  @@index([paymentStatus]) // Payment tracking queries
+}
+
+// Individual line items within a sale - products/services sold
+// Maintains historical accuracy even if inventory items change later
+model SaleItem {
+  id              String    @id @default(cuid())
+  saleId          String    // Foreign key to Sale
+  inventoryItemId String?   // Optional link to inventory item (for stock tracking)
+  
+  // Product details (stored at time of sale for historical accuracy)
+  productName     String    // Product/service name as sold
+  productCategory String?   // Product category for reporting
+  quantity        Int       // Quantity sold
+  unitPrice       Decimal   @db.Decimal(10, 2) // Price per unit at time of sale
+  unitCost        Decimal?  @db.Decimal(10, 2) // Cost per unit (for accurate profit calculation)
+  lineTotal       Decimal   @db.Decimal(10, 2) // quantity * unitPrice
+  lineProfit      Decimal?  @db.Decimal(10, 2) // (unitPrice - unitCost) * quantity
+  
+  // Relations
+  sale            Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  inventoryItem   Inventory? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  
+  // Indexes for analytics and reporting
+  @@index([saleId]) // Fast sale-based queries
+  @@index([inventoryItemId]) // Inventory tracking and analytics
+}
+
+// NextAuth.js verification tokens for email verification and password reset
 model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
+  identifier String   // Email or other identifier
+  token      String   @unique // Verification token
+  expires    DateTime // Token expiration time
 
   @@unique([identifier, token])
 }
