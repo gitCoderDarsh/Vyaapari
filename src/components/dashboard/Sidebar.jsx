@@ -1,12 +1,13 @@
 "use client"
 
-import { User, Package, LogOut, Bot } from "lucide-react"
+import { User, Package, LogOut, Bot, Receipt } from "lucide-react"
 
 const iconMap = {
   User,
   Package,
   LogOut,
-  Bot
+  Bot,
+  Receipt
 }
 
 export default function Sidebar({ navItems, activeTab, handleNavClick, setShowLogoutModal, isCollapsed = false }) {

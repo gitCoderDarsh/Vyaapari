@@ -248,6 +248,7 @@ export default function AssistantPage() {
 
   const navItems = [
     { name: "Inventory", icon: "Package", active: false },
+    { name: "Sales", icon: "Receipt", active: false },
     { name: "Assistant", icon: "Bot", active: true },
     { name: "Profile", icon: "User", active: false },
   ]
@@ -260,6 +261,12 @@ export default function AssistantPage() {
       setIsSidebarCollapsed(false)
       setTimeout(() => {
         router.push("/dashboard/inventory")
+      }, 320) // Wait for animation to complete
+    } else if (itemName === "Sales") {
+      // Expand sidebar with animation before navigating
+      setIsSidebarCollapsed(false)
+      setTimeout(() => {
+        router.push("/dashboard/sales")
       }, 320) // Wait for animation to complete
     } else if (itemName === "Assistant") {
       // Already on Assistant page

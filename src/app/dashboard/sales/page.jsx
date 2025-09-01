@@ -1,6 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import React, { useState, useEffect, useMemo } from "react"
+import { useSession, signOut } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import MobileHeader from "@/components/dashboard/MobileHeader"
+import MobileMenu from "@/components/dashboard/MobileMenu"
+import Sidebar from "@/components/dashboard/Sidebar"
+import LogoutModal from "@/components/dashboard/LogoutModal"
+import Toast from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -410,6 +417,119 @@ function BillPreviewDialog({
 }
 
 export default function SalesPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("Sales")
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" })
+
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type })
+  }
+
+  const hideToast = () => {
+    setToast({ show: false, message: "", type: "success" })
+  }
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth")
+    }
+  }, [status, router])
+
+  const navItems = [
+    { name: "Inventory", icon: "Package", active: false },
+    { name: "Sales", icon: "Receipt", active: true },
+    { name: "Assistant", icon: "Bot", active: false },
+    { name: "Profile", icon: "User", active: false },
+  ]
+
+  const handleNavClick = (itemName) => {
+    if (itemName === "Logout") {
+      setShowLogoutModal(true)
+    } else if (itemName === "Inventory") {
+      router.push("/dashboard/inventory")
+    } else if (itemName === "Sales") {
+      router.push("/dashboard/sales")
+    } else if (itemName === "Assistant") {
+      sessionStorage.setItem('navigatingToAssistant', 'true')
+      router.push("/dashboard/assistant")
+    } else if (itemName === "Profile") {
+      router.push("/dashboard/profile")
+    }
+  }
+
+  const handleLogout = () => {
+    setShowLogoutModal(false)
+    showToast("Logging out... See you soon!", "success")
+    setTimeout(() => {
+      signOut({ callbackUrl: "/auth" })
+    }, 1000)
+  }
+
+  // Show loading while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-black flex">
+      {/* Desktop Sidebar */}
+      <Sidebar 
+        navItems={navItems}
+        activeTab={activeTab}
+        handleNavClick={handleNavClick}
+        setShowLogoutModal={setShowLogoutModal}
+      />
+
+      {/* Mobile Menu */}
+      <MobileMenu
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        navItems={navItems}
+        activeTab={activeTab}
+        handleNavClick={handleNavClick}
+        setShowLogoutModal={setShowLogoutModal}
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 md:ml-64">
+        {/* Mobile Header */}
+        <MobileHeader 
+          onMenuClick={() => setIsMobileMenuOpen(true)}
+          activeTab={activeTab}
+        />
+
+        {/* Page Content */}
+        <SalesContent showToast={showToast} />
+      </div>
+
+      {/* Logout Modal */}
+      <LogoutModal 
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
+
+      {/* Toast Notification */}
+      <Toast 
+        show={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={hideToast}
+      />
+    </div>
+  )
+}
+
+// Sales content component
+function SalesContent({ showToast }) {
   const [rows, setRows] = useState(initialSales)
   const [query, setQuery] = useState("")
   const [previewRow, setPreviewRow] = useState(null)
@@ -462,10 +582,12 @@ export default function SalesPage() {
   function addSale(r) {
     setRows((prev) => [r, ...prev])
     setPage(1)
+    showToast("Sale created successfully!", "success")
   }
 
   function deleteSale(id) {
     setRows((prev) => prev.filter((r) => r.id !== id))
+    showToast("Sale deleted successfully", "success")
   }
 
   function openPreview(r) {
@@ -474,7 +596,7 @@ export default function SalesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-4 sm:p-6">
+    <main className="min-h-screen bg-black text-white p-4 sm:p-6">
       {/* Header */}
       <h1 className="text-xl font-bold mb-4 text-pretty">Sales Dashboard</h1>
 

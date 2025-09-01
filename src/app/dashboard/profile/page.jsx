@@ -96,6 +96,7 @@ export default function ProfilePage() {
 
   const navItems = [
     { name: "Inventory", icon: "Package", active: false },
+    { name: "Sales", icon: "Receipt", active: false },
     { name: "Assistant", icon: "Bot", active: false },
     { name: "Profile", icon: "User", active: true },
   ]
@@ -217,6 +218,8 @@ export default function ProfilePage() {
       setShowLogoutModal(true)
     } else if (itemName === "Inventory") {
       router.push("/dashboard/inventory")
+    } else if (itemName === "Sales") {
+      router.push("/dashboard/sales")
     } else if (itemName === "Assistant") {
       // Set a flag so Assistant page knows to start with transition
       sessionStorage.setItem('navigatingToAssistant', 'true')
